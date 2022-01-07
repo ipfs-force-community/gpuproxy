@@ -17,8 +17,7 @@ impl ProofRpc for ProofImpl {
     }
 }
 
-pub fn register(mut io: IoHandler) -> IoHandler {
+pub fn register(io: &mut IoHandler)  {
     let proof_impl = ProofImpl{};
     io.extend_with(proof_impl.to_delegate());
-    return io
 }
