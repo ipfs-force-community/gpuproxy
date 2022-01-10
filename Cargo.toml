@@ -1,0 +1,19 @@
+cargo-features = ["edition2021"]
+[package]
+name = "c2proxy"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+filecoin-proofs-api = "10.1.0"
+clap = { version = "3.0.4", features = ["derive", "env"] }
+jsonrpc-core = { version = "18.0.0", features = [] }
+jsonrpc-derive = "18.0.0"
+jsonrpc-http-server = "18.0.0"
+jsonrpc-core-client = "18.0.0"
+log = { version = "0.4", features = ["std"] }
+simplelog = "*"
+diesel = { version = "1.4.4", features = ["sqlite", "numeric"] }
+forest_address = "0.3.2"
