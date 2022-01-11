@@ -4,16 +4,19 @@ pub mod schema;
 use schema::tasks;
 use std::sync::{Mutex};
 
-#[derive(Queryable)]
+#[derive(Identifiable,Queryable)]
 pub struct Task {
     pub id: i64,
     pub miner: String,
     pub prove_id: String,
-    pub sector_id: u64,
-    pub phase1_output: Vec<u8>,
-    pub proof: Vec<u8>,
-    pub status: u8,
+    pub sector_id: i64,
+    pub phase1_output: String,
+    pub proof: String,
+    pub task_type: i32,
+    pub error_msg: String,
+    pub status: i32,
     pub create_at: i64,
+    pub start_at: i64,
     pub complete_at: i64,
 }
 
@@ -23,11 +26,10 @@ pub struct NewTask {
     pub miner: String,
     pub prove_id: String,
     pub sector_id: i64,
-    pub phase1_output: Vec<u8>,
-    pub proof: Vec<u8>,
-    pub status: i64,
+    pub phase1_output: String,
+    pub task_type: i32,
+    pub status: i32,
     pub create_at: i64,
-    pub complete_at: i64,
 }
 
 pub fn establish_connection(conn_string: &str) -> Mutex<SqliteConnection> {
