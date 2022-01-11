@@ -1,6 +1,6 @@
 use filecoin_proofs_api::seal::{SealCommitPhase1Output};
 use filecoin_proofs_api::{ProverId, SectorId};
-
+use crate::task_pool::Taskpool;
 use crate::models::{Task};
 
 use jsonrpc_core::{Result, Error, ErrorCode};
@@ -10,6 +10,7 @@ use jsonrpc_http_server::jsonrpc_core::IoHandler;
 use diesel::prelude::*;
 
 use std::sync::{Mutex};
+use serde_json::json;
 
 #[rpc]
 pub trait ProofRpc {
@@ -22,11 +23,11 @@ pub trait ProofRpc {
                   miner: String,
                   prover_id: ProverId,
                   sector_id: SectorId,
-    ) -> Result<bool>;
+    ) -> Result<i64>;
 }
 
 pub struct ProofImpl {
-    conn: Mutex<SqliteConnection>,
+    pool: Taskpool,
 }
 
 impl ProofRpc for ProofImpl {
@@ -40,12 +41,15 @@ impl ProofRpc for ProofImpl {
           miner: String,
           prover_id: ProverId,
           sector_id: SectorId,
-    ) -> Result<bool> {
-        todo!()
+    ) -> Result<i64> {
+        let hex_prover_id = hex::encode(prover_id);
+        let phase1_json = json!(phase1_output);
+        let row_id =  self.pool.add(miner, hex_prover_id, sector_id.0 as i64, phase1_json.to_string()).unwrap();
+        Ok(row_id)
     }
 }
 
-pub fn register(io: &mut IoHandler, conn: Mutex<SqliteConnection>) {
-    let proof_impl = ProofImpl {conn};
+pub fn register(io: &mut IoHandler, pool: Taskpool) {
+    let proof_impl = ProofImpl {pool};
     io.extend_with(proof_impl.to_delegate());
 }
