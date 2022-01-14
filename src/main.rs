@@ -12,8 +12,9 @@ use crate::proof_rpc::*;
 use log::*;
 use simplelog::*;
 use clap::{App, AppSettings, Arg};
-
+use std::sync::Arc;
 use jsonrpc_http_server::ServerBuilder;
+use jsonrpc_http_server::Server;
 use jsonrpc_http_server::jsonrpc_core::IoHandler;
 
 
@@ -44,26 +45,30 @@ fn main() {
         .get_matches();
 
     match app_m.subcommand() {
-        Some(("run", sub_m)) => {
+        Some(("run", ref sub_m)) => {
             let url: String = sub_m.value_of_t("url").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
             let cfg = ServiceConfig::new(url, db_dsn);
-
-            let mut io = IoHandler::default();
-
             let db_conn = models::establish_connection(cfg.db_dsn.as_str());
-            proof::register(io.borrow_mut(), db_conn);
-
-         //  let path = Path::new(&cfg.url).join("rpc/v0").as_path().to_str().unwrap().to_string();
-        //    println!("path {}", path)
-            let server = ServerBuilder::new(io)
-                .threads(3)
-                .start_http(&cfg.url.parse().unwrap())
-                .unwrap();
-
-            info!("starting listening {}", cfg.url);
+            let task_pool = task_pool::TaskpoolImpl::new(db_conn);
+            let server = run_cfg(cfg, task_pool);
             server.wait();
         } // run was used
         _ => {} // Either no subcommand or one not tested for...
     }
 }
+
+fn run_cfg(cfg: ServiceConfig, task_pool: task_pool::TaskpoolImpl) ->Server {
+
+    let mut io = IoHandler::default();
+    let arc_pool = Arc::new(task_pool);
+    let worker = worker::LocalWorker::new(arc_pool.clone());
+    proof::register(io.borrow_mut(), arc_pool);
+
+    let server = ServerBuilder::new(io)
+        .start_http(&cfg.url.parse().unwrap())
+        .unwrap();
+
+    info!("starting listening {}", cfg.url);
+    server
+}//run cfg

@@ -1,17 +1,13 @@
 use filecoin_proofs_api::seal::{seal_commit_phase2, SealCommitPhase1Output, SealCommitPhase2Output};
 use filecoin_proofs_api::{ProverId, SectorId};
-use std::sync::{Mutex};
-use crate::models::{Task};
+use std::sync::Arc;
 use anyhow::Result;
-use diesel::prelude::*;
-use crate::models::schema::tasks::dsl::*;
 use std::time::Duration;
 
-use crate::task_pool;
+use crate::task_pool::*;
 use ticker::Ticker;
 use log::*;
 use hex::{FromHex};
-use jsonrpc_core::serde::Serialize;
 
 pub trait Worker {
     fn seal_commit_phase2(&self,
@@ -24,8 +20,15 @@ pub trait Worker {
 }
 
 pub struct LocalWorker {
-    task_pool: dyn task_pool::Taskpool
+    pub task_pool:  Arc<dyn Taskpool+ Send + Sync>
 }
+
+impl LocalWorker{
+    pub fn new(task_pool:  Arc<dyn Taskpool+ Send + Sync>) -> Self {
+        LocalWorker { task_pool }
+    }
+}
+
 
 impl Worker for LocalWorker {
     fn seal_commit_phase2(&self,
@@ -37,7 +40,7 @@ impl Worker for LocalWorker {
     }
 
     fn process_tasks(&self) {
-        let ticker = Ticker::new((0..), Duration::from_secs(1));
+        let ticker = Ticker::new((0..) ,Duration::from_secs(1));
         for _ in ticker {
             let result = self.task_pool.fetch_one_todo();
             match result {

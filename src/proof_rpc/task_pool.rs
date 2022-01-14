@@ -1,19 +1,11 @@
-use std::error::Error;
 use std::ops::Deref;
 use crate::models::{NewTask, Task};
 use crate::models::schema::tasks::dsl::*;
 use std::sync::{Mutex};
 use diesel::insert_into;
 use diesel::prelude::*;
-use jsonrpc_core::to_string;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-use std::time::Duration;
-use log::error;
-use ticker::Ticker;
-
-use log::*;
-use simplelog::*;
 use anyhow::{anyhow, Result};
 use chrono::Utc;
 
@@ -37,9 +29,19 @@ pub trait Taskpool {
     fn record_proof(&self, tid: i64, proof: String) -> Option<anyhow::Error>;
 }
 
+
 pub struct TaskpoolImpl {
     conn: Mutex<SqliteConnection>,
 }
+
+impl TaskpoolImpl {
+    pub fn new(conn: Mutex<SqliteConnection>) -> Self {
+        TaskpoolImpl { conn }
+    }
+}
+
+unsafe impl Send for TaskpoolImpl {}
+unsafe impl Sync for TaskpoolImpl {}
 
 impl Taskpool for TaskpoolImpl {
     fn add(&self, miner_arg: String, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: String,) -> Result<i64> {
@@ -52,6 +54,7 @@ impl Taskpool for TaskpoolImpl {
             status:TaskStatus::Init.into(),
             create_at: Utc::now().timestamp(),
         };
+
         let lock = self.conn.lock().unwrap();
         let result = insert_into(tasks).values(&new_task).execute(lock.deref());
 
@@ -98,7 +101,7 @@ impl Taskpool for TaskpoolImpl {
             start_at.eq(Utc::now().timestamp()),
         )).execute(lock.deref());
         match update_result {
-            Ok(val) => Ok(result),
+            Ok(_) => Ok(result),
             Err(e) => Err(anyhow!(e.to_string())),
         }
     }
@@ -110,7 +113,7 @@ impl Taskpool for TaskpoolImpl {
                                                            error_msg.eq(err_msg_str),
                                                            )).execute(lock.deref());
         match update_result {
-            Ok(val) => Option::None,
+            Ok(_) => Option::None,
             Err(e) => Some(anyhow!(e.to_string())),
         }
     }
