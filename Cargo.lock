@@ -319,6 +319,8 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "crossbeam",
+ "crossbeam-utils",
  "diesel",
  "filecoin-proofs-api",
  "forest_address",

@@ -23,3 +23,5 @@ anyhow = "1.0.52"
 hex = {version ="0.4.3", feature = "alloc"}
 serde_json = { version = "1.0" }
 chrono = "0.4.19"
+crossbeam = "0.8.1"
+crossbeam-utils = "0.8.6"

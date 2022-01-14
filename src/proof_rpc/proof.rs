@@ -1,6 +1,7 @@
 use filecoin_proofs_api::seal::{SealCommitPhase1Output};
 use filecoin_proofs_api::{ProverId};
 use crate::task_pool::{Taskpool};
+use crate::models::{Task};
 
 use jsonrpc_core::{Result};
 use jsonrpc_derive::rpc;
@@ -18,6 +19,9 @@ pub trait ProofRpc {
                   prover_id: ProverId,
                   sector_id: i64,
     ) -> Result<i64>;
+
+    #[rpc(name = "PROOF.GetTask")]
+    fn get_task(&self, id: i64) -> Result<Task>;
 }
 
 pub struct ProofImpl {
@@ -33,8 +37,11 @@ impl ProofRpc for ProofImpl {
     ) -> Result<i64> {
         let hex_prover_id = hex::encode(prover_id);
         let phase1_json = json!(phase1_output);
-        let row_id =  self.pool.add(miner, hex_prover_id, sector_id, phase1_json.to_string()).unwrap();
-        Ok(row_id)
+        Ok(self.pool.add(miner, hex_prover_id, sector_id, phase1_json.to_string()).unwrap())
+    }
+
+    fn get_task(&self, id: i64) -> Result<Task> {
+        Ok(self.pool.fetch(id).unwrap())
     }
 }
 

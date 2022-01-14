@@ -16,6 +16,7 @@ use std::sync::Arc;
 use jsonrpc_http_server::ServerBuilder;
 use jsonrpc_http_server::Server;
 use jsonrpc_http_server::jsonrpc_core::IoHandler;
+use crate::worker::Worker;
 
 
 fn main() {
@@ -49,22 +50,22 @@ fn main() {
             let url: String = sub_m.value_of_t("url").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
             let cfg = ServiceConfig::new(url, db_dsn);
-            let db_conn = models::establish_connection(cfg.db_dsn.as_str());
-            let task_pool = task_pool::TaskpoolImpl::new(db_conn);
-            let server = run_cfg(cfg, task_pool);
+            let server = run_cfg(cfg);
             server.wait();
         } // run was used
         _ => {} // Either no subcommand or one not tested for...
     }
 }
 
-fn run_cfg(cfg: ServiceConfig, task_pool: task_pool::TaskpoolImpl) ->Server {
+fn run_cfg(cfg: ServiceConfig) ->Server {
+    let db_conn = models::establish_connection(cfg.db_dsn.as_str());
+    let task_pool = task_pool::TaskpoolImpl::new(db_conn);
 
     let mut io = IoHandler::default();
     let arc_pool = Arc::new(task_pool);
     let worker = worker::LocalWorker::new(arc_pool.clone());
     proof::register(io.borrow_mut(), arc_pool);
-
+    worker.process_tasks();
     let server = ServerBuilder::new(io)
         .start_http(&cfg.url.parse().unwrap())
         .unwrap();
