@@ -17,7 +17,6 @@ use jsonrpc_http_server::ServerBuilder;
 use jsonrpc_http_server::Server;
 use jsonrpc_http_server::jsonrpc_core::IoHandler;
 use crate::worker::Worker;
-use uuid::{Uuid};
 use crate::task_pool::Taskpool;
 
 fn main() {
@@ -61,13 +60,13 @@ fn main() {
 fn run_cfg(cfg: ServiceConfig) ->Server {
     let db_conn = models::establish_connection(cfg.db_dsn.as_str());
     let task_pool = task_pool::TaskpoolImpl::new(db_conn);
+    let worker_id = task_pool.get_worker_id().unwrap();
 
     let mut io = IoHandler::default();
     let arc_pool = Arc::new(task_pool);
     let worker = worker::LocalWorker::new(arc_pool.clone());
 
-    let worker_id = task_pool.get_worker_id().unwrap();
-    proof::register(io.borrow_mut(), Some(worker_id.to_string()), arc_pool);
+    proof::register(io.borrow_mut(), worker_id.to_string(), arc_pool);
 
     worker.process_tasks();
     info!("ready for receive worker address");
