@@ -18,6 +18,7 @@ use jsonrpc_http_server::Server;
 use jsonrpc_http_server::jsonrpc_core::IoHandler;
 use crate::worker::Worker;
 use crate::task_pool::Taskpool;
+use anyhow::{Result};
 
 fn main() {
     TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
@@ -32,15 +33,22 @@ fn main() {
                 .about("run daemon for provide service")
                 .args(&[
                     Arg::new("url")
-                    .long("url")
-                    .env("C2PROXY_URL")
-                    .default_value("127.0.0.1:8888")
-                    .help("specify url for provide service api service"),
+                        .long("url")
+                        .env("C2PROXY_URL")
+                        .default_value("127.0.0.1:8888")
+                        .help("specify url for provide service api service"),
                     Arg::new("db-dsn")
                         .long("db-dsn")
                         .env("C2PROXY_DSN")
                         .default_value("task.db")
-                        .help("specify sqlite path to store task")
+                        .help("specify sqlite path to store task"),
+                    Arg::new("disable-worker")
+                        .long("disable-worker")
+                        .env("C2PROXY_DISABLE_WORKER")
+                        .required(false)
+                        .takes_value(false)
+                        .default_value("false")
+                        .help("disable worker on c2proxy manager"),
                 ]),
         )
         .get_matches();
@@ -49,18 +57,19 @@ fn main() {
         Some(("run", ref sub_m)) => {
             let url: String = sub_m.value_of_t("url").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
-            let cfg = ServiceConfig::new(url, db_dsn);
-            let server = run_cfg(cfg);
+            let disable_worker: bool = sub_m.value_of_t("disable-worker").unwrap_or_else(|e| e.exit());
+            let cfg = ServiceConfig::new(url, db_dsn, disable_worker);
+            let server = run_cfg(cfg).unwrap();
             server.wait();
         } // run was used
         _ => {} // Either no subcommand or one not tested for...
     }
 }
 
-fn run_cfg(cfg: ServiceConfig) ->Server {
+fn run_cfg(cfg: ServiceConfig) -> Result<Server> {
     let db_conn = models::establish_connection(cfg.db_dsn.as_str());
     let task_pool = task_pool::TaskpoolImpl::new(db_conn);
-    let worker_id = task_pool.get_worker_id().unwrap();
+    let worker_id = task_pool.get_worker_id()?;
 
     let mut io = IoHandler::default();
     let arc_pool = Arc::new(task_pool);
@@ -68,13 +77,15 @@ fn run_cfg(cfg: ServiceConfig) ->Server {
 
     proof::register(io.borrow_mut(), worker_id.to_string(), arc_pool);
 
-    worker.process_tasks();
-    info!("ready for receive worker address");
+    if cfg.disable_worker {
+        worker.process_tasks();
+        info!("ready for local worker address worker_id {}", worker_id);
+    }
 
     let server = ServerBuilder::new(io)
-        .start_http(&cfg.url.parse().unwrap())
+        .start_http(&cfg.url.parse()?)
         .unwrap();
 
     info!("starting listening {}", cfg.url);
-    server
+    Ok(server)
 }//run cfg
