@@ -1,4 +1,4 @@
-use filecoin_proofs_api::seal::{SealCommitPhase1Output};
+use std::str::FromStr;
 use filecoin_proofs_api::{ProverId};
 use crate::task_pool::{Taskpool};
 use crate::models::{Task};
@@ -8,13 +8,12 @@ use jsonrpc_derive::rpc;
 use jsonrpc_http_server::jsonrpc_core::IoHandler;
 
 use std::sync::Arc;
-use serde_json::json;
 
 #[rpc]
 pub trait ProofRpc {
     #[rpc(name = "PROOF.SubmitTask")]
     fn submit_task(&self,
-                  phase1_output: SealCommitPhase1Output,
+                  phase1_output: Vec<u8>,
                   miner: String,
                   prover_id: ProverId,
                   sector_id: i64,
@@ -30,14 +29,15 @@ pub struct ProofImpl {
 
 impl ProofRpc for ProofImpl {
     fn submit_task(&self,
-          phase1_output: SealCommitPhase1Output,
+          phase1_output: Vec<u8>,
           miner: String,
           prover_id: ProverId,
           sector_id: i64,
     ) -> Result<i64> {
+        let scp1o = serde_json::from_slice(phase1_output.as_slice()).unwrap();
+        let addr = forest_address::Address::from_str(miner.as_str()).unwrap();
         let hex_prover_id = hex::encode(prover_id);
-        let phase1_json = json!(phase1_output);
-        Ok(self.pool.add(miner, hex_prover_id, sector_id, phase1_json.to_string()).unwrap())
+        Ok(self.pool.add(addr, hex_prover_id, sector_id, scp1o).unwrap())
     }
 
     fn get_task(&self, id: i64) -> Result<Task> {

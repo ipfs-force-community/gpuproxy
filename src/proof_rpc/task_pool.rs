@@ -5,6 +5,7 @@ use std::sync::{Mutex};
 use diesel::insert_into;
 use diesel::prelude::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use filecoin_proofs_api::seal::{SealCommitPhase1Output};
 
 use anyhow::{anyhow, Result};
 use chrono::Utc;
@@ -20,7 +21,7 @@ pub enum TaskStatus {
 }
 
 pub trait Taskpool {
-    fn add(&self, miner_arg: String, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: String,) -> Result<i64>;
+    fn add(&self, miner_arg: forest_address::Address, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: SealCommitPhase1Output) -> Result<i64>;
     fn fetch(&self, tid: i64) -> Result<Task>;
     fn fetch_undo(&self) -> Result<Vec<Task>>;
     fn fetch_one_todo(&self) -> Result<Task>;
@@ -44,12 +45,13 @@ unsafe impl Send for TaskpoolImpl {}
 unsafe impl Sync for TaskpoolImpl {}
 
 impl Taskpool for TaskpoolImpl {
-    fn add(&self, miner_arg: String, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: String,) -> Result<i64> {
+    fn add(&self, miner_arg: forest_address::Address, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: SealCommitPhase1Output,) -> Result<i64> {
+        let miner_noprefix = &miner_arg.to_string()[1..];
         let new_task = NewTask{
-            miner: miner_arg,
+            miner: miner_noprefix.to_string(),
             prove_id: prove_id_arg,
             sector_id: sector_id_arg,
-            phase1_output: phase1_output_arg,
+            phase1_output: serde_json::to_string(&phase1_output_arg).unwrap(),
             task_type:0,
             status:TaskStatus::Init.into(),
             create_at: Utc::now().timestamp(),

@@ -5,11 +5,10 @@ use anyhow::Result;
 use std::time::Duration;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::task_pool::*;
-use ticker::Ticker;
 use log::*;
 use hex::FromHex;
 use crossbeam_utils::thread;
-
+use crossbeam_channel::tick;
 pub trait Worker {
     fn seal_commit_phase2(&self,
                           phase1_output_arg: SealCommitPhase1Output,
@@ -41,9 +40,10 @@ impl Worker for LocalWorker {
     }
 
     fn process_tasks(&self) {
-        let ticker = Ticker::new((0..) ,Duration::from_secs(1));
-        let  count = Arc::new(AtomicUsize::new(0));
-        for _ in ticker {
+        let ticker = tick(Duration::from_millis(100));
+        loop {
+            ticker.recv().unwrap();
+            let  count = Arc::new(AtomicUsize::new(0));
             if count.load(Ordering::SeqCst) >= self.max_task {
                 continue
             }

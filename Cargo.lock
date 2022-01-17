@@ -93,6 +93,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4521f3e3d031370679b3b140beb36dfe4801b09ac77e30c61941f97df3ef28b"
 
 [[package]]
+name = "base64"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
+
+[[package]]
 name = "bellperson"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -317,9 +323,11 @@ name = "c2proxy"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64",
  "chrono",
  "clap",
  "crossbeam",
+ "crossbeam-channel",
  "crossbeam-utils",
  "diesel",
  "filecoin-proofs-api",
@@ -331,9 +339,9 @@ dependencies = [
  "jsonrpc-http-server",
  "log",
  "num_enum",
+ "serde",
  "serde_json",
  "simplelog",
- "ticker",
 ]
 
 [[package]]
@@ -2594,12 +2602,6 @@ checksum = "d050e60b33d41c19108b32cea32164033a9013fe3b46cbd4457559bfbf77afaa"
 dependencies = [
  "num_cpus",
 ]
-
-[[package]]
-name = "ticker"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f6821a2afe2700471d4572a25bcbfc091d6d596902a279ed41af139f350b76e"
 
 [[package]]
 name = "time"

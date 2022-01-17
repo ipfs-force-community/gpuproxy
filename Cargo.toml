@@ -18,10 +18,12 @@ simplelog = "*"
 diesel = { version = "1.4.4", features = ["sqlite", "numeric"] }
 forest_address = "0.3.2"
 num_enum = "0.5.6"
-ticker = "0.1.1"
 anyhow = "1.0.52"
 hex = {version ="0.4.3", feature = "alloc"}
+crossbeam-channel = "0.5.2"
 serde_json = { version = "1.0" }
+serde = "1.0.133"
 chrono = "0.4.19"
 crossbeam = "0.8.1"
 crossbeam-utils = "0.8.6"
+base64 = "0.13.0"
