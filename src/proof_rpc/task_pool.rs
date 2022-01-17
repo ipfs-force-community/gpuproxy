@@ -1,5 +1,5 @@
 use std::ops::Deref;
-use crate::models::{NewTask, Task};
+use crate::models::{NewTask, Task, WorkerInfo, NewWorkerInfo};
 use crate::models::schema::tasks::dsl::*;
 use std::sync::{Mutex};
 use diesel::insert_into;
@@ -9,6 +9,9 @@ use filecoin_proofs_api::seal::{SealCommitPhase1Output};
 
 use anyhow::{anyhow, Result};
 use chrono::Utc;
+use log::info;
+use uuid::Uuid;
+use crate::models::schema::worker_infos::dsl::worker_infos;
 
 #[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(i32)]
@@ -28,6 +31,7 @@ pub trait Taskpool {
     fn get_status(&self, tid: i64) -> Result<TaskStatus>;
     fn record_error(&self, tid: i64, err_msg: String) -> Option<anyhow::Error>;
     fn record_proof(&self, tid: i64, proof: String) -> Option<anyhow::Error>;
+    fn get_worker_id(&self) -> Result<uuid::Uuid>;
 }
 
 
@@ -130,6 +134,27 @@ impl Taskpool for TaskpoolImpl {
         match update_result {
             Ok(_) => Option::None,
             Err(e) => Some(anyhow!(e.to_string())),
+        }
+    }
+
+    fn get_worker_id(&self) -> Result<uuid::Uuid> {
+        let lock = self.conn.lock().unwrap();
+        let row_count: i64 =  worker_infos.count().get_result(lock.deref()).unwrap();
+        if row_count > 0 {
+           let uid =  uuid::Uuid::new_v4();
+            let new_worker_info = NewWorkerInfo{
+                worker_id: uid.to_string(),
+            };
+
+            let lock = self.conn.lock().unwrap();
+            let result = insert_into(worker_infos).values(&new_worker_info).execute(lock.deref()).unwrap();
+            info!("create worker id {}", result);
+           Ok(uid)
+        } else {
+           let worker_info: WorkerInfo =  worker_infos.first(lock.deref()).unwrap();
+            let load_worker_id = Uuid::parse_str(worker_info.worker_id.as_str()).unwrap();
+            info!("load worker id {}", load_worker_id.to_string());
+            Ok(load_worker_id)
         }
     }
 }

@@ -15,3 +15,16 @@ table! {
         complete_at -> BigInt,
     }
 }
+
+
+table! {
+    worker_infos (id) {
+        id -> BigInt,
+        worker_id -> Text,
+    }
+}
+
+allow_tables_to_appear_in_same_query!(
+    tasks,
+    worker_infos,
+);

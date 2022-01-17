@@ -1,12 +1,13 @@
-use diesel::prelude::*;
 pub mod schema;
+
+use diesel::prelude::*;
 use schema::tasks;
+use schema::worker_infos;
 use std::sync::{Mutex};
 use serde::{Serialize, Deserialize};
 use serde::{Serializer, Deserializer};
 
 #[derive(Debug, Serialize, Deserialize, Identifiable,Queryable)]
-#[table_name = "tasks"]
 pub struct Task {
     pub id: i64,
     pub miner: String,
@@ -23,7 +24,7 @@ pub struct Task {
     pub complete_at: i64,
 }
 
-#[derive(Debug, Insertable, Queryable)]
+#[derive(Debug, Insertable)]
 #[table_name = "tasks"]
 pub struct NewTask {
     pub miner: String,
@@ -34,6 +35,18 @@ pub struct NewTask {
     pub task_type: i32,
     pub status: i32,
     pub create_at: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize,Queryable)]
+pub struct WorkerInfo {
+    pub id: i64,
+    pub worker_id: String,
+}
+
+#[derive(Debug, Insertable)]
+#[table_name = "worker_infos"]
+pub struct NewWorkerInfo {
+    pub worker_id: String,
 }
 
 pub fn establish_connection(conn_string: &str) -> Mutex<SqliteConnection> {
