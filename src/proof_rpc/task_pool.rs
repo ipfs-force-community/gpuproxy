@@ -21,7 +21,7 @@ pub enum TaskStatus {
 }
 
 pub trait Taskpool {
-    fn add(&self, miner_arg: forest_address::Address, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: SealCommitPhase1Output) -> Result<i64>;
+    fn add(&self, miner_arg: forest_address::Address, worker_id: String, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: SealCommitPhase1Output) -> Result<i64>;
     fn fetch(&self, tid: i64) -> Result<Task>;
     fn fetch_undo(&self) -> Result<Vec<Task>>;
     fn fetch_one_todo(&self) -> Result<Task>;
@@ -45,10 +45,11 @@ unsafe impl Send for TaskpoolImpl {}
 unsafe impl Sync for TaskpoolImpl {}
 
 impl Taskpool for TaskpoolImpl {
-    fn add(&self, miner_arg: forest_address::Address, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: SealCommitPhase1Output,) -> Result<i64> {
+    fn add(&self, miner_arg: forest_address::Address, worker_id_arg: String, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: SealCommitPhase1Output,) -> Result<i64> {
         let miner_noprefix = &miner_arg.to_string()[1..];
         let new_task = NewTask{
             miner: miner_noprefix.to_string(),
+            worker_id: worker_id_arg,
             prove_id: prove_id_arg,
             sector_id: sector_id_arg,
             phase1_output: serde_json::to_string(&phase1_output_arg).unwrap(),

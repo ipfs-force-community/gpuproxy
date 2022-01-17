@@ -27,3 +27,4 @@ chrono = "0.4.19"
 crossbeam = "0.8.1"
 crossbeam-utils = "0.8.6"
 base64 = "0.13.0"
+uuid = { version = "0.8", features = ["v4"] }

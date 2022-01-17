@@ -24,6 +24,7 @@ pub trait ProofRpc {
 }
 
 pub struct ProofImpl {
+    worker_id: String,
     pool: Arc<dyn Taskpool+ Send + Sync>
 }
 
@@ -37,7 +38,7 @@ impl ProofRpc for ProofImpl {
         let scp1o = serde_json::from_slice(phase1_output.as_slice()).unwrap();
         let addr = forest_address::Address::from_str(miner.as_str()).unwrap();
         let hex_prover_id = hex::encode(prover_id);
-        Ok(self.pool.add(addr, hex_prover_id, sector_id, scp1o).unwrap())
+        Ok(self.pool.add(addr, self.worker_id.clone(), hex_prover_id, sector_id, scp1o).unwrap())
     }
 
     fn get_task(&self, id: i64) -> Result<Task> {
@@ -45,7 +46,7 @@ impl ProofRpc for ProofImpl {
     }
 }
 
-pub fn register(io: &mut IoHandler, pool:  Arc<dyn Taskpool+ Send + Sync>) {
-    let proof_impl = ProofImpl {pool};
+pub fn register(io: &mut IoHandler, worker_id: String, pool:  Arc<dyn Taskpool+ Send + Sync>) {
+    let proof_impl = ProofImpl {worker_id, pool};
     io.extend_with(proof_impl.to_delegate());
 }

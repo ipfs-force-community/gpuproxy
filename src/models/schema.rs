@@ -6,6 +6,7 @@ table! {
         sector_id -> BigInt,
         phase1_output -> Text,
         proof -> Text,
+        worker_id -> Text,
         task_type -> Integer,
         error_msg -> Text,
         status -> Integer,

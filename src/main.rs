@@ -17,6 +17,7 @@ use jsonrpc_http_server::ServerBuilder;
 use jsonrpc_http_server::Server;
 use jsonrpc_http_server::jsonrpc_core::IoHandler;
 use crate::worker::Worker;
+use uuid::{Uuid};
 
 fn main() {
     TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
@@ -63,7 +64,8 @@ fn run_cfg(cfg: ServiceConfig) ->Server {
     let mut io = IoHandler::default();
     let arc_pool = Arc::new(task_pool);
     let worker = worker::LocalWorker::new(arc_pool.clone());
-    proof::register(io.borrow_mut(), arc_pool);
+    let worker_id = Uuid::new_v4();
+    proof::register(io.borrow_mut(), worker_id.to_string(), arc_pool);
     worker.process_tasks();
     let server = ServerBuilder::new(io)
         .start_http(&cfg.url.parse().unwrap())
