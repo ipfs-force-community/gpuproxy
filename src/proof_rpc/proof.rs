@@ -2,15 +2,22 @@ use std::str::FromStr;
 use filecoin_proofs_api::{ProverId};
 use crate::proof_rpc::task_pool::{Taskpool};
 use crate::models::{Task};
-use jsonrpc_core::{Result};
+use jsonrpc_core::{Result,Error,ErrorCode};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::jsonrpc_core::IoHandler;
-use jsonrpc_core_client::transports::local;
-
+use jsonrpc_core_client::transports::http;
 use std::sync::Arc;
 
 #[rpc(client, server)]
 pub trait ProofRpc {
+
+    #[rpc(name = "PROOF.RecordProof")]
+    fn record_proof(&self, tid: i64, proof: String) -> Result<bool>;
+    
+    #[rpc(name = "PROOF.RecordError")]
+    fn record_error(&self, tid: i64, err_msg: String) -> Result<bool>;
+
+
     #[rpc(name = "PROOF.SubmitTask")]
     fn submit_task(&self,
                   phase1_output: Vec<u8>,
@@ -23,12 +30,14 @@ pub trait ProofRpc {
     fn get_task(&self, id: i64) -> Result<Task>;
 
     #[rpc(name = "PROOF.FetchTodo")]
-    fn fetch_todo(&self) -> Result<Task>;
+    fn fetch_todo(&self) -> Result<Task> ;
+
+
 }
 
 pub struct ProofImpl {
-    worker_id: Option<String>,
-    pool: Option<Arc<dyn Taskpool+ Send + Sync>>
+    worker_id: String,
+    pool: Arc<dyn Taskpool+ Send + Sync>
 }
 
 impl ProofRpc for ProofImpl {
@@ -41,27 +50,52 @@ impl ProofRpc for ProofImpl {
         let scp1o = serde_json::from_slice(phase1_output.as_slice()).unwrap();
         let addr = forest_address::Address::from_str(miner.as_str()).unwrap();
         let hex_prover_id = hex::encode(prover_id);
-        Ok(self.pool.as_ref().unwrap().add(addr, self.worker_id.as_ref().unwrap().clone(), hex_prover_id, sector_id, scp1o).unwrap())
+        Ok(self.pool.add(addr, self.worker_id.clone(), hex_prover_id, sector_id, scp1o).unwrap())
     }
 
     fn get_task(&self, id: i64) -> Result<Task> {
-        Ok(self.pool.as_ref().unwrap().fetch(id).unwrap())
+        Ok(self.pool.fetch(id).unwrap())
     }
 
     fn fetch_todo(&self) -> Result<Task> {
-        Ok(self.pool.as_ref().unwrap().fetch_one_todo().unwrap())
+        Ok(self.pool.fetch_one_todo().unwrap())
+    }
+
+    
+    fn record_error(&self, tid: i64, err_msg: String) -> Result<bool> {
+      match  self.pool.record_error(tid, err_msg) {
+          Some(val) => Err(
+            Error{
+                code: ErrorCode::InternalError,
+                message: val.to_string(),
+                data:None,
+             }
+          ),
+          _ => Ok(true)
+      }
+    }
+
+    fn record_proof(&self, tid: i64, proof: String) -> Result<bool> {
+        match  self.pool.record_proof(tid, proof) {
+            Some(val) => Err(
+              Error{
+                  code: ErrorCode::InternalError,
+                  message: val.to_string(),
+                  data:None,
+               }
+            ),
+            _ => Ok(true)
+        }
     }
 }
 
-pub fn register(io: &mut IoHandler, worker_id: String, pool:  Arc<dyn Taskpool+ Send + Sync>) {
-    let proof_impl = ProofImpl {worker_id: Some(worker_id), pool:Some(pool)};
+pub fn register(worker_id: String, pool:  Arc<dyn Taskpool+ Send + Sync>) -> IoHandler {
+    let mut io = IoHandler::default();
+    let proof_impl = ProofImpl {worker_id: worker_id, pool:pool};
     io.extend_with(proof_impl.to_delegate());
+    io 
 }
 
-pub fn get_client(url: String) {
-    let mut io = IoHandler::new();
-    let proof_impl = ProofImpl{worker_id:None, pool: None};
-    io.extend_with(proof_impl.to_delegate());
-
-    let (client, _) = local::connect::<gen_client::Client, _, _>(io);
+pub async fn get_client(url: String) -> gen_client::Client {
+    http::connect::<gen_client::Client>(url.as_str()).await.unwrap()
 }

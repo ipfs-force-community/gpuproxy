@@ -1,4 +1,3 @@
-use std::borrow::BorrowMut;
 use c2proxy::config::*;
 use c2proxy::proof_rpc::*;
 use c2proxy::models::*;
@@ -9,7 +8,6 @@ use clap::{App, AppSettings, Arg};
 use std::sync::Arc;
 use jsonrpc_http_server::ServerBuilder;
 use jsonrpc_http_server::Server;
-use jsonrpc_http_server::jsonrpc_core::IoHandler;
 use crate::worker::Worker;
 use crate::task_pool::Taskpool;
 use anyhow::{Result};
@@ -63,13 +61,13 @@ fn main() {
 fn run_cfg(cfg: ServiceConfig) -> Result<Server> {
     let db_conn = establish_connection(cfg.db_dsn.as_str());
     let task_pool = task_pool::TaskpoolImpl::new(db_conn);
-    let worker_id = task_pool.get_worker_id()?;
+    let worker_id = task_pool.WorkerApi.get_worker_id()?;
 
-    let mut io = IoHandler::default();
+   
     let arc_pool = Arc::new(task_pool);
     let worker = worker::LocalWorker::new(arc_pool.clone());
 
-    proof::register(io.borrow_mut(), worker_id.to_string(), arc_pool);
+   let io = proof::register(worker_id.to_string(), arc_pool);
 
     if cfg.disable_worker {
         worker.process_tasks();

@@ -9,6 +9,8 @@ use log::*;
 use hex::FromHex;
 use crossbeam_utils::thread;
 use crossbeam_channel::tick;
+
+
 pub trait Worker {
     fn seal_commit_phase2(&self,
                           phase1_output_arg: SealCommitPhase1Output,
@@ -21,11 +23,11 @@ pub trait Worker {
 
 pub struct LocalWorker {
     pub max_task: usize,
-    pub task_pool:  Arc<dyn Taskpool+ Send + Sync>
+    pub task_pool:  Arc<dyn WorkerFetch+ Send + Sync>
 }
 
 impl LocalWorker{
-    pub fn new(task_pool:  Arc<dyn Taskpool+ Send + Sync>) -> Self {
+    pub fn new(task_pool:  Arc<dyn WorkerFetch+ Send + Sync>) -> Self {
         LocalWorker { max_task:10, task_pool }
     }
 }
