@@ -4,7 +4,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use std::time::Duration;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use crate::task_pool::*;
+use crate::proof_rpc::task_pool::*;
 use log::*;
 use hex::FromHex;
 use crossbeam_utils::thread;

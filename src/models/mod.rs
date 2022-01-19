@@ -8,6 +8,7 @@ use serde::{Serialize, Deserialize};
 use serde::{Serializer, Deserializer};
 
 #[derive(Debug, Serialize, Deserialize, Identifiable,Queryable)]
+#[serde(rename_all = "camelCase")]
 pub struct Task {
     pub id: i64,
     pub miner: String,

@@ -1,8 +1,7 @@
 use std::str::FromStr;
 use filecoin_proofs_api::{ProverId};
-use crate::task_pool::{Taskpool};
+use crate::proof_rpc::task_pool::{Taskpool};
 use crate::models::{Task};
-
 use jsonrpc_core::{Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::jsonrpc_core::IoHandler;
@@ -21,6 +20,9 @@ pub trait ProofRpc {
 
     #[rpc(name = "PROOF.GetTask")]
     fn get_task(&self, id: i64) -> Result<Task>;
+
+    #[rpc(name = "PROOF.FetchTodo")]
+    fn fetch_todo(&self) -> Result<Task>;
 }
 
 pub struct ProofImpl {
@@ -43,6 +45,10 @@ impl ProofRpc for ProofImpl {
 
     fn get_task(&self, id: i64) -> Result<Task> {
         Ok(self.pool.fetch(id).unwrap())
+    }
+
+    fn fetch_todo(&self) -> Result<Task> {
+        Ok(self.pool.fetch_one_todo().unwrap())
     }
 }
 

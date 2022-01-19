@@ -1,13 +1,7 @@
-#[macro_use]
-extern crate diesel;
-
-mod config;
-mod proof_rpc;
-mod models;
-
 use std::borrow::BorrowMut;
-use crate::config::*;
-use crate::proof_rpc::*;
+use c2proxy::config::*;
+use c2proxy::proof_rpc::*;
+use c2proxy::models::*;
 
 use log::*;
 use simplelog::*;
@@ -67,7 +61,7 @@ fn main() {
 }
 
 fn run_cfg(cfg: ServiceConfig) -> Result<Server> {
-    let db_conn = models::establish_connection(cfg.db_dsn.as_str());
+    let db_conn = establish_connection(cfg.db_dsn.as_str());
     let task_pool = task_pool::TaskpoolImpl::new(db_conn);
     let worker_id = task_pool.get_worker_id()?;
 
