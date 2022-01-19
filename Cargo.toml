@@ -24,9 +24,10 @@ clap = { version = "3.0.4", features = ["derive", "env"] }
 jsonrpc-core = { version = "18.0.0", features = [] }
 jsonrpc-derive = "18.0.0"
 jsonrpc-http-server = "18.0.0"
-jsonrpc-core-client = "18.0.0"
+jsonrpc-core-client = {version="18.0.0", features = ["http"]}
 log = { version = "0.4", features = ["std"] }
 simplelog = "*"
+hyper = "0.9.1"
 diesel = { version = "1.4.4", features = ["sqlite", "numeric"] }
 forest_address = "0.3.2"
 num_enum = "0.5.6"
