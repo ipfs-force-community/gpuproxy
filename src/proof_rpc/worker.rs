@@ -22,13 +22,14 @@ pub trait Worker {
 }
 
 pub struct LocalWorker {
+    pub worker_id: String,
     pub max_task: usize,
     pub task_pool:  Arc<dyn WorkerFetch+ Send + Sync>
 }
 
 impl LocalWorker{
-    pub fn new(task_pool:  Arc<dyn WorkerFetch+ Send + Sync>) -> Self {
-        LocalWorker { max_task:10, task_pool }
+    pub fn new(worker_id: String, task_pool:  Arc<dyn WorkerFetch+ Send + Sync>) -> Self {
+        LocalWorker { worker_id, max_task:10, task_pool }
     }
 }
 
@@ -50,20 +51,28 @@ impl Worker for LocalWorker {
                 continue
             }
             count.fetch_add(1, Ordering::SeqCst);
-            let result = self.task_pool.fetch_one_todo();
+            let result = self.task_pool.fetch_one_todo(self.worker_id.clone());
             match result {
                 Ok(undo_task) => {
                     let count_clone = Arc::clone(&count);
                     let task_pool = self.task_pool.clone();
                     thread::scope(|s| {
                         s.spawn(|_| {
+                            defer! {
+                                count_clone.fetch_sub(1, Ordering::SeqCst);
+                            }
                             let prover_id_arg: ProverId = FromHex::from_hex(undo_task.prove_id).unwrap();
                             let sector_id_arg: SectorId = SectorId::from(undo_task.sector_id as u64);
                             let phase1_output_arg: SealCommitPhase1Output = serde_json::from_str( undo_task.phase1_output.as_str()).unwrap();
-                            let proof_arg = self.seal_commit_phase2(phase1_output_arg, prover_id_arg, sector_id_arg).unwrap();
-                            let bytes = serde_json::to_string(&proof_arg).unwrap();
-                            task_pool.record_proof(undo_task.id, bytes);
-                            count_clone.fetch_sub(1, Ordering::SeqCst);
+                            match self.seal_commit_phase2(phase1_output_arg, prover_id_arg, sector_id_arg){
+                                Ok(proof_arg) => {
+                                    let bytes = serde_json::to_string(&proof_arg).unwrap();
+                                    task_pool.record_proof(self.worker_id.clone(), undo_task.id, bytes);
+                                }
+                                Err(e) => {
+                                    task_pool.record_error(self.worker_id.clone(), undo_task.id, e.to_string());
+                                }
+                            }
                         });
                     }).unwrap();
                 },

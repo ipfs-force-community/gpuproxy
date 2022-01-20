@@ -28,13 +28,13 @@ pub trait WorkerApi {
 }
 
 pub trait WorkerFetch {
-    fn fetch_one_todo(&self) -> Result<Task>;
-    fn record_error(&self, tid: i64, err_msg: String) -> Option<anyhow::Error>;
-    fn record_proof(&self, tid: i64, proof: String) -> Option<anyhow::Error>;
+    fn fetch_one_todo(&self,  worker_id_arg: String) -> Result<Task>;
+    fn record_error(&self,  worker_id_arg: String, tid: i64,   err_msg: String) -> Option<anyhow::Error>;
+    fn record_proof(&self,  worker_id_arg: String, tid: i64, proof: String) -> Option<anyhow::Error>;
 }
 
 pub trait Common {
-    fn add(&self, miner_arg: forest_address::Address, worker_id: String, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: SealCommitPhase1Output) -> Result<i64>;
+    fn add(&self, miner_arg: forest_address::Address, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: SealCommitPhase1Output) -> Result<i64>;
     fn fetch(&self, tid: i64) -> Result<Task>;
     fn fetch_undo(&self) -> Result<Vec<Task>>;
     fn get_status(&self, tid: i64) -> Result<TaskStatus>;
@@ -80,12 +80,13 @@ impl WorkerApi for TaskpoolImpl {
 }
 
 impl WorkerFetch for TaskpoolImpl {
-    fn fetch_one_todo(&self) -> Result<Task> {
+    fn fetch_one_todo(&self, worker_id_arg: String) -> Result<Task> {
         let lock = self.conn.lock().unwrap();
         let predicate = status.eq::<i32>(TaskStatus::Init.into());
         let result: Task = tasks.filter(&predicate).first(lock.deref()).unwrap();
         let update_result = diesel::update(tasks.filter(id.eq(result.id))).set((
             status.eq::<i32>(TaskStatus::Init.into()),
+            worker_id.eq(worker_id_arg),
             start_at.eq(Utc::now().timestamp()),
         )).execute(lock.deref());
         match update_result {
@@ -94,10 +95,11 @@ impl WorkerFetch for TaskpoolImpl {
         }
     }
 
-    fn record_error(&self, _tid: i64, err_msg_str: String) -> Option<anyhow::Error> {
+    fn record_error(&self,  worker_id_arg: String, tid: i64, err_msg_str: String) -> Option<anyhow::Error> {
         let lock = self.conn.lock().unwrap();
-        let update_result = diesel::update(tasks.filter(id.eq(_tid))).set((
+        let update_result = diesel::update(tasks.filter(id.eq(tid))).set((
                                                            status.eq::<i32>(TaskStatus::Error.into()),
+                                                           worker_id.eq(worker_id_arg),
                                                            error_msg.eq(err_msg_str),
                                                            )).execute(lock.deref());
         match update_result {
@@ -106,10 +108,11 @@ impl WorkerFetch for TaskpoolImpl {
         }
     }
 
-    fn record_proof(&self, _tid: i64, proof_str: String) -> Option<anyhow::Error> {
+    fn record_proof(&self,  worker_id_arg: String, tid: i64, proof_str: String) -> Option<anyhow::Error> {
         let lock = self.conn.lock().unwrap();
-        let update_result = diesel::update(tasks.filter(id.eq(_tid))).set((
+        let update_result = diesel::update(tasks.filter(id.eq(tid))).set((
             status.eq::<i32>(TaskStatus::Error.into()),
+            worker_id.eq(worker_id_arg),
             proof.eq(proof_str),
         )).execute(lock.deref());
         match update_result {
@@ -120,11 +123,11 @@ impl WorkerFetch for TaskpoolImpl {
 }
 
 impl Common for TaskpoolImpl {
-    fn add(&self, miner_arg: forest_address::Address, worker_id_arg: String, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: SealCommitPhase1Output,) -> Result<i64> {
+    fn add(&self, miner_arg: forest_address::Address, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: SealCommitPhase1Output,) -> Result<i64> {
         let miner_noprefix = &miner_arg.to_string()[1..];
         let new_task = NewTask{
             miner: miner_noprefix.to_string(),
-            worker_id: worker_id_arg,
+            worker_id: "".to_string(),
             prove_id: prove_id_arg,
             sector_id: sector_id_arg,
             phase1_output: serde_json::to_string(&phase1_output_arg).unwrap(),

@@ -51,8 +51,7 @@ fn main() {
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
             let disable_worker: bool = sub_m.value_of_t("disable-worker").unwrap_or_else(|e| e.exit());
             let cfg = ServiceConfig::new(url, db_dsn, disable_worker);
-            let server = run_cfg(cfg).unwrap();
-            server.wait();
+            run_cfg(cfg).unwrap().wait();
         } // run was used
         _ => {} // Either no subcommand or one not tested for...
     }
@@ -65,9 +64,9 @@ fn run_cfg(cfg: ServiceConfig) -> Result<Server> {
 
    
     let arc_pool = Arc::new(task_pool);
-    let worker = worker::LocalWorker::new(arc_pool.clone());
+    let worker = worker::LocalWorker::new(worker_id.to_string(), arc_pool.clone());
 
-   let io = proof::register(worker_id.to_string(), arc_pool);
+   let io = proof::register(arc_pool);
 
     if cfg.disable_worker {
         worker.process_tasks();

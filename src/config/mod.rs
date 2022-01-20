@@ -18,11 +18,12 @@ impl ServiceConfig {
 
 #[derive(Clone, Debug)]
 pub struct ClientConfig {
-    pub url: String
+    pub url: String,
+    pub db_dsn: String,
 }
 
 impl ClientConfig {
-    pub fn new(url: String) -> Self {
-        ClientConfig { url }
+    pub fn new(url: String, db_dsn: String) -> Self {
+        ClientConfig { url,db_dsn }
     }
 }

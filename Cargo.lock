@@ -329,6 +329,7 @@ dependencies = [
  "crossbeam",
  "crossbeam-channel",
  "crossbeam-utils",
+ "defer",
  "diesel",
  "filecoin-proofs-api",
  "forest_address",
@@ -339,6 +340,7 @@ dependencies = [
  "jsonrpc-http-server",
  "log",
  "num_enum",
+ "scopeguard",
  "serde",
  "serde_json",
  "simplelog",
@@ -606,6 +608,12 @@ dependencies = [
  "data-encoding",
  "syn",
 ]
+
+[[package]]
+name = "defer"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "647605a6345d5e89c3950a36a638c56478af9b414c55c6f2477c73b115f9acde"
 
 [[package]]
 name = "derive_more"
