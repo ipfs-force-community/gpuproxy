@@ -15,3 +15,14 @@ impl ServiceConfig {
         }
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct ClientConfig {
+    pub url: String
+}
+
+impl ClientConfig {
+    pub fn new(url: String) -> Self {
+        ClientConfig { url }
+    }
+}

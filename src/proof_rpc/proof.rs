@@ -1,12 +1,13 @@
 use std::str::FromStr;
 use filecoin_proofs_api::{ProverId};
-use crate::proof_rpc::task_pool::{Taskpool};
+use crate::proof_rpc::task_pool::*;
 use crate::models::{Task};
-use jsonrpc_core::{Result,Error,ErrorCode};
+use jsonrpc_core::{Result,Error, ErrorCode};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::jsonrpc_core::IoHandler;
 use jsonrpc_core_client::transports::http;
 use std::sync::Arc;
+use anyhow::anyhow;
 
 #[rpc(client, server)]
 pub trait ProofRpc {
@@ -91,11 +92,46 @@ impl ProofRpc for ProofImpl {
 
 pub fn register(worker_id: String, pool:  Arc<dyn Taskpool+ Send + Sync>) -> IoHandler {
     let mut io = IoHandler::default();
-    let proof_impl = ProofImpl {worker_id: worker_id, pool:pool};
+    let proof_impl = ProofImpl {worker_id, pool};
     io.extend_with(proof_impl.to_delegate());
     io 
 }
 
-pub async fn get_client(url: String) -> gen_client::Client {
-    http::connect::<gen_client::Client>(url.as_str()).await.unwrap()
+pub async fn get_worker_api(url: String) -> WrapClient {
+    WrapClient::new(http::connect::<gen_client::Client>(url.as_str()).await.unwrap())
+}
+
+pub struct WrapClient{
+    client:gen_client::Client
+}
+
+impl WrapClient {
+    fn new(client:gen_client::Client) ->Self {
+        return WrapClient{
+            client
+        }
+    }
+}
+
+impl WorkerFetch for WrapClient{
+    fn fetch_one_todo(&self) -> anyhow::Result<Task> {
+        match jsonrpc_core::futures_executor::block_on(self.client.fetch_todo()) {
+            Ok(t)=>Ok(t),
+            Err(e)=>Err(anyhow!(e.to_string()))
+        }
+    }
+
+     fn record_error(&self, tid: i64, err_msg: String) -> Option<anyhow::Error> {
+         match jsonrpc_core::futures_executor::block_on(self.client.record_error(tid, err_msg)) {
+             Ok(_)=> None,
+             Err(e)=>Some(anyhow!(e.to_string()))
+         }
+    }
+
+     fn record_proof(&self, tid: i64, proof: String) -> Option<anyhow::Error> {
+         match jsonrpc_core::futures_executor::block_on(self.client.record_proof(tid, proof)) {
+             Ok(_)=> None,
+             Err(e)=>Some(anyhow!(e.to_string()))
+         }
+    }
 }

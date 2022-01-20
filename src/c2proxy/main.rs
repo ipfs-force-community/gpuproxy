@@ -9,7 +9,7 @@ use std::sync::Arc;
 use jsonrpc_http_server::ServerBuilder;
 use jsonrpc_http_server::Server;
 use crate::worker::Worker;
-use crate::task_pool::Taskpool;
+use crate::task_pool::*;
 use anyhow::{Result};
 
 fn main() {
@@ -61,7 +61,7 @@ fn main() {
 fn run_cfg(cfg: ServiceConfig) -> Result<Server> {
     let db_conn = establish_connection(cfg.db_dsn.as_str());
     let task_pool = task_pool::TaskpoolImpl::new(db_conn);
-    let worker_id = task_pool.WorkerApi.get_worker_id()?;
+    let worker_id = task_pool.get_worker_id()?;
 
    
     let arc_pool = Arc::new(task_pool);

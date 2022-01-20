@@ -33,15 +33,15 @@ pub trait WorkerFetch {
     fn record_proof(&self, tid: i64, proof: String) -> Option<anyhow::Error>;
 }
 
-pub trait _inner {
+pub trait Common {
     fn add(&self, miner_arg: forest_address::Address, worker_id: String, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: SealCommitPhase1Output) -> Result<i64>;
     fn fetch(&self, tid: i64) -> Result<Task>;
     fn fetch_undo(&self) -> Result<Vec<Task>>;
     fn get_status(&self, tid: i64) -> Result<TaskStatus>;
 }
 
-pub trait Taskpool:WorkerApi+WorkerFetch+_inner{}
-
+pub trait Taskpool:WorkerApi+WorkerFetch+Common{}
+impl<T> Taskpool for T where T: WorkerApi + WorkerFetch + Common {}
 
 pub struct TaskpoolImpl {
     conn: Mutex<SqliteConnection>,
@@ -55,6 +55,7 @@ impl TaskpoolImpl {
 
 unsafe impl Send for TaskpoolImpl {}
 unsafe impl Sync for TaskpoolImpl {}
+
 impl WorkerApi for TaskpoolImpl {
     fn get_worker_id(&self) -> Result<uuid::Uuid> {
         let lock = self.conn.lock().unwrap();
@@ -118,7 +119,7 @@ impl WorkerFetch for TaskpoolImpl {
     }
 }
 
-impl _inner for TaskpoolImpl {
+impl Common for TaskpoolImpl {
     fn add(&self, miner_arg: forest_address::Address, worker_id_arg: String, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: SealCommitPhase1Output,) -> Result<i64> {
         let miner_noprefix = &miner_arg.to_string()[1..];
         let new_task = NewTask{
@@ -150,15 +151,6 @@ impl _inner for TaskpoolImpl {
         }
     }
 
-    fn get_status(&self, tid: i64) -> Result<TaskStatus> {
-        let lock = self.conn.lock().unwrap();
-        let result: QueryResult::<i32> = tasks.select(status).filter(id.eq(tid)).get_result(lock.deref());
-        match result {
-            Ok(val) => Ok(TaskStatus::try_from(val).unwrap()),
-            Err(e) => Err(anyhow!(e.to_string())),
-        }
-    }
-
     fn fetch_undo(&self) -> Result<Vec<Task>> {
         let lock = self.conn.lock().unwrap();
         let result = tasks.filter(status.eq::<i32>(TaskStatus::Init.into()))
@@ -168,10 +160,16 @@ impl _inner for TaskpoolImpl {
             Err(e) => Err(anyhow!(e.to_string())),
         }
     }
+
+    fn get_status(&self, tid: i64) -> Result<TaskStatus> {
+        let lock = self.conn.lock().unwrap();
+        let result: QueryResult::<i32> = tasks.select(status).filter(id.eq(tid)).get_result(lock.deref());
+        match result {
+            Ok(val) => Ok(TaskStatus::try_from(val).unwrap()),
+            Err(e) => Err(anyhow!(e.to_string())),
+        }
+    }
 }
-
-
-
 
 #[cfg(test)]
 mod tests{
