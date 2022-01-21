@@ -52,6 +52,7 @@ impl Worker for LocalWorker {
             }
             count.fetch_add(1, Ordering::SeqCst);
             let result = self.task_pool.fetch_one_todo(self.worker_id.clone());
+
             match result {
                 Ok(undo_task) => {
                     let count_clone = Arc::clone(&count);
@@ -66,8 +67,8 @@ impl Worker for LocalWorker {
                             let phase1_output_arg: SealCommitPhase1Output = serde_json::from_str( undo_task.phase1_output.as_str()).unwrap();
                             match self.seal_commit_phase2(phase1_output_arg, prover_id_arg, sector_id_arg){
                                 Ok(proof_arg) => {
-                                    let bytes = serde_json::to_string(&proof_arg).unwrap();
-                                    task_pool.record_proof(self.worker_id.clone(), undo_task.id, bytes);
+                                    let base64_proof = base64::encode(proof_arg.proof).to_string();
+                                    task_pool.record_proof(self.worker_id.clone(), undo_task.id, base64_proof);
                                 }
                                 Err(e) => {
                                     task_pool.record_error(self.worker_id.clone(), undo_task.id, e.to_string());

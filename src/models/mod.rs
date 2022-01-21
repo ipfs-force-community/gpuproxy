@@ -55,7 +55,7 @@ pub fn establish_connection(conn_string: &str) -> Mutex<SqliteConnection> {
 }
 
 #[derive(Debug)]
-struct Bas64Byte(Vec<u8>);
+pub struct Bas64Byte(pub Vec<u8>);
 
 
 impl Serialize for Bas64Byte {

@@ -1,9 +1,10 @@
 use std::str::FromStr;
 use filecoin_proofs_api::{ProverId};
 use crate::proof_rpc::task_pool::*;
-use crate::models::{Task};
+use crate::models::{Task, Bas64Byte};
 use jsonrpc_core::{Result,Error, ErrorCode};
 use jsonrpc_derive::rpc;
+
 use jsonrpc_http_server::jsonrpc_core::IoHandler;
 use jsonrpc_core_client::transports::http;
 use std::sync::Arc;
@@ -11,24 +12,24 @@ use anyhow::anyhow;
 
 #[rpc(client, server)]
 pub trait ProofRpc {
-    #[rpc(name = "PROOF.SubmitTask")]
+    #[rpc(name = "Proof.SubmitTask")]
     fn submit_task(&self,
-                  phase1_output: Vec<u8>,
+                  phase1_output: Bas64Byte,
                   miner: String,
                   prover_id: ProverId,
                   sector_id: i64,
     ) -> Result<i64>;
 
-    #[rpc(name = "PROOF.GetTask")]
+    #[rpc(name = "Proof.GetTask")]
     fn get_task(&self, id: i64) -> Result<Task>;
 
-    #[rpc(name = "PROOF.FetchTodo")]
+    #[rpc(name = "Proof.FetchTodo")]
     fn fetch_todo(&self, worker_id_arg: String) -> Result<Task> ;
 
-    #[rpc(name = "PROOF.RecordProof")]
+    #[rpc(name = "Proof.RecordProof")]
     fn record_proof(&self, worker_id_arg: String, tid: i64, proof: String) -> Result<bool>;
 
-    #[rpc(name = "PROOF.RecordError")]
+    #[rpc(name = "Proof.RecordError")]
     fn record_error(&self, worker_id_arg: String, tid: i64, err_msg: String) -> Result<bool>;
 
 }
@@ -39,12 +40,12 @@ pub struct ProofImpl {
 
 impl ProofRpc for ProofImpl {
     fn submit_task(&self,
-          phase1_output: Vec<u8>,
+          phase1_output: Bas64Byte,
           miner: String,
           prover_id: ProverId,
           sector_id: i64,
     ) -> Result<i64> {
-        let scp1o = serde_json::from_slice(phase1_output.as_slice()).unwrap();
+        let scp1o = serde_json::from_slice(phase1_output.0.as_slice()).unwrap();
         let addr = forest_address::Address::from_str(miner.as_str()).unwrap();
         let hex_prover_id = hex::encode(prover_id);
         Ok(self.pool.add(addr, hex_prover_id, sector_id, scp1o).unwrap())

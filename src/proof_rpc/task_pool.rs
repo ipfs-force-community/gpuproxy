@@ -85,7 +85,7 @@ impl WorkerFetch for TaskpoolImpl {
         let predicate = status.eq::<i32>(TaskStatus::Init.into());
         let result: Task = tasks.filter(&predicate).first(lock.deref()).unwrap();
         let update_result = diesel::update(tasks.filter(id.eq(result.id))).set((
-            status.eq::<i32>(TaskStatus::Init.into()),
+            status.eq::<i32>(TaskStatus::Running.into()),
             worker_id.eq(worker_id_arg),
             start_at.eq(Utc::now().timestamp()),
         )).execute(lock.deref());
@@ -97,11 +97,17 @@ impl WorkerFetch for TaskpoolImpl {
 
     fn record_error(&self,  worker_id_arg: String, tid: i64, err_msg_str: String) -> Option<anyhow::Error> {
         let lock = self.conn.lock().unwrap();
-        let update_result = diesel::update(tasks.filter(id.eq(tid))).set((
-                                                           status.eq::<i32>(TaskStatus::Error.into()),
-                                                           worker_id.eq(worker_id_arg),
-                                                           error_msg.eq(err_msg_str),
-                                                           )).execute(lock.deref());
+        let update_result = diesel::update(
+            tasks.filter(
+                id.eq(tid)
+            )
+        ).set(
+            (
+                    status.eq::<i32>(TaskStatus::Error.into()),
+                    worker_id.eq(worker_id_arg),
+                    error_msg.eq(err_msg_str),
+                   )
+            ).execute(lock.deref());
         match update_result {
             Ok(_) => Option::None,
             Err(e) => Some(anyhow!(e.to_string())),
@@ -110,11 +116,16 @@ impl WorkerFetch for TaskpoolImpl {
 
     fn record_proof(&self,  worker_id_arg: String, tid: i64, proof_str: String) -> Option<anyhow::Error> {
         let lock = self.conn.lock().unwrap();
-        let update_result = diesel::update(tasks.filter(id.eq(tid))).set((
-            status.eq::<i32>(TaskStatus::Error.into()),
-            worker_id.eq(worker_id_arg),
-            proof.eq(proof_str),
-        )).execute(lock.deref());
+        let update_result = diesel::update(
+            tasks.filter(
+                id.eq(tid)
+                    )
+        ).set(
+            (status.eq::<i32>(TaskStatus::Completed.into()),
+                         worker_id.eq(worker_id_arg),
+                         proof.eq(proof_str),
+                    )
+        ).execute(lock.deref());
         match update_result {
             Ok(_) => Option::None,
             Err(e) => Some(anyhow!(e.to_string())),
