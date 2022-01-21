@@ -55,8 +55,13 @@ pub fn establish_connection(conn_string: &str) -> Mutex<SqliteConnection> {
 }
 
 #[derive(Debug)]
-pub struct Bas64Byte(pub Vec<u8>);
+pub struct Bas64Byte(Vec<u8>);
 
+impl Into<Vec<u8>> for Bas64Byte {
+    fn into(self) -> Vec<u8> {
+       self.0
+    }
+}
 
 impl Serialize for Bas64Byte {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

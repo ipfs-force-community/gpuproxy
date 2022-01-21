@@ -45,7 +45,8 @@ impl ProofRpc for ProofImpl {
           prover_id: ProverId,
           sector_id: i64,
     ) -> Result<i64> {
-        let scp1o = serde_json::from_slice(phase1_output.0.as_slice()).unwrap();
+
+        let scp1o = serde_json::from_slice(Into::<Vec<u8>>::into(phase1_output).as_slice()).unwrap();
         let addr = forest_address::Address::from_str(miner.as_str()).unwrap();
         let hex_prover_id = hex::encode(prover_id);
         Ok(self.pool.add(addr, hex_prover_id, sector_id, scp1o).unwrap())
