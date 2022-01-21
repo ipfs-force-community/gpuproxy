@@ -86,9 +86,10 @@ impl WorkerFetch for TaskpoolImpl {
         let result: Task = tasks.filter(&predicate).first(lock.deref()).unwrap();
         let update_result = diesel::update(tasks.filter(id.eq(result.id))).set((
             status.eq::<i32>(TaskStatus::Running.into()),
-            worker_id.eq(worker_id_arg),
+            worker_id.eq(worker_id_arg.clone()),
             start_at.eq(Utc::now().timestamp()),
         )).execute(lock.deref());
+        info!("worker {} fetch {} to do", worker_id_arg, result.id);
         match update_result {
             Ok(_) => Ok(result),
             Err(e) => Err(anyhow!(e.to_string())),
@@ -104,10 +105,11 @@ impl WorkerFetch for TaskpoolImpl {
         ).set(
             (
                     status.eq::<i32>(TaskStatus::Error.into()),
-                    worker_id.eq(worker_id_arg),
-                    error_msg.eq(err_msg_str),
+                    worker_id.eq(worker_id_arg.clone()),
+                    error_msg.eq(err_msg_str.clone()),
                    )
             ).execute(lock.deref());
+        info!("worker {} mark task {} as error reason:{}", worker_id_arg, tid, err_msg_str);
         match update_result {
             Ok(_) => Option::None,
             Err(e) => Some(anyhow!(e.to_string())),
@@ -122,10 +124,11 @@ impl WorkerFetch for TaskpoolImpl {
                     )
         ).set(
             (status.eq::<i32>(TaskStatus::Completed.into()),
-                         worker_id.eq(worker_id_arg),
+                         worker_id.eq(worker_id_arg.clone()),
                          proof.eq(proof_str),
                     )
         ).execute(lock.deref());
+        info!("worker {} complete task {} successfully", worker_id_arg, tid);
         match update_result {
             Ok(_) => Option::None,
             Err(e) => Some(anyhow!(e.to_string())),
