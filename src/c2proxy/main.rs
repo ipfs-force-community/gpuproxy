@@ -1,6 +1,7 @@
 use c2proxy::config::*;
 use c2proxy::proof_rpc::*;
 use c2proxy::models::*;
+use c2proxy::models::migrations::*;
 
 use log::*;
 use simplelog::*;
@@ -11,6 +12,7 @@ use jsonrpc_http_server::Server;
 use crate::worker::Worker;
 use crate::task_pool::*;
 use anyhow::{Result};
+use std::sync::{Mutex};
 
 fn main() {
     TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
@@ -59,16 +61,15 @@ fn main() {
 
 fn run_cfg(cfg: ServiceConfig) -> Result<Server> {
     let db_conn = establish_connection(cfg.db_dsn.as_str());
-    let task_pool = task_pool::TaskpoolImpl::new(db_conn);
+    run_db_migrations(&db_conn).expect("migrations error");
+    let task_pool = task_pool::TaskpoolImpl::new(Mutex::new(db_conn));
     let worker_id = task_pool.get_worker_id()?;
 
-   
     let arc_pool = Arc::new(task_pool);
     let worker = worker::LocalWorker::new(worker_id.to_string(), arc_pool.clone());
 
    let io = proof::register(arc_pool);
-
-    if cfg.disable_worker {
+    if !cfg.disable_worker {
         worker.process_tasks();
         info!("ready for local worker address worker_id {}", worker_id);
     }

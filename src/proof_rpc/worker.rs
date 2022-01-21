@@ -43,7 +43,8 @@ impl Worker for LocalWorker {
     }
 
     fn process_tasks(&self) {
-        let ticker = tick(Duration::from_millis(100));
+        info!("worker {} start to worker and wait for new tasks", self.worker_id.clone());
+        let ticker = tick(Duration::from_secs(10));
         loop {
             ticker.recv().unwrap();
             let  count = Arc::new(AtomicUsize::new(0));
@@ -55,6 +56,7 @@ impl Worker for LocalWorker {
 
             match result {
                 Ok(undo_task) => {
+                    info!("worker {} got task {} todo", self.worker_id.clone(), undo_task.id);
                     let count_clone = Arc::clone(&count);
                     let task_pool = self.task_pool.clone();
                     thread::scope(|s| {

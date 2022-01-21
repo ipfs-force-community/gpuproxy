@@ -10,12 +10,12 @@ CREATE TABLE tasks (
                        error_msg Text,
                        status INTEGER NOT NULL,
                        create_at INTEGER NOT NULL,
-                       start_at  -> INTEGER,
+                       start_at   INTEGER,
                        complete_at INTEGER
 );
 
 CREATE TABLE worker_infos (
                        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                       worker_id TEXT(256) NOT NULL,
+                       worker_id TEXT(256) NOT NULL
                     
 );

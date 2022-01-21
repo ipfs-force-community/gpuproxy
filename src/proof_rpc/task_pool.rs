@@ -58,21 +58,19 @@ unsafe impl Sync for TaskpoolImpl {}
 
 impl WorkerApi for TaskpoolImpl {
     fn get_worker_id(&self) -> Result<uuid::Uuid> {
-        let lock = self.conn.lock().unwrap();
-        let row_count: i64 =  worker_infos.count().get_result(lock.deref()).unwrap();
-        if row_count > 0 {
+        let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
+        let row_count: i64 =  worker_infos.count().get_result(lock.deref())?;
+        if row_count == 0 {
            let uid =  uuid::Uuid::new_v4();
             let new_worker_info = NewWorkerInfo{
                 worker_id: uid.to_string(),
             };
-
-            let lock = self.conn.lock().unwrap();
-            let result = insert_into(worker_infos).values(&new_worker_info).execute(lock.deref()).unwrap();
+            let result = insert_into(worker_infos).values(&new_worker_info).execute(lock.deref())?;
             info!("create worker id {}", result);
            Ok(uid)
         } else {
-           let worker_info: WorkerInfo =  worker_infos.first(lock.deref()).unwrap();
-            let load_worker_id = Uuid::parse_str(worker_info.worker_id.as_str()).unwrap();
+            let worker_info: WorkerInfo =  worker_infos.first(lock.deref())?;
+            let load_worker_id = Uuid::parse_str(worker_info.worker_id.as_str())?;
             info!("load worker id {}", load_worker_id.to_string());
             Ok(load_worker_id)
         }
@@ -81,9 +79,9 @@ impl WorkerApi for TaskpoolImpl {
 
 impl WorkerFetch for TaskpoolImpl {
     fn fetch_one_todo(&self, worker_id_arg: String) -> Result<Task> {
-        let lock = self.conn.lock().unwrap();
+        let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
         let predicate = status.eq::<i32>(TaskStatus::Init.into());
-        let result: Task = tasks.filter(&predicate).first(lock.deref()).unwrap();
+        let result: Task = tasks.filter(&predicate).first(lock.deref())?;
         let update_result = diesel::update(tasks.filter(id.eq(result.id))).set((
             status.eq::<i32>(TaskStatus::Running.into()),
             worker_id.eq(worker_id_arg.clone()),
@@ -97,7 +95,9 @@ impl WorkerFetch for TaskpoolImpl {
     }
 
     fn record_error(&self,  worker_id_arg: String, tid: i64, err_msg_str: String) -> Option<anyhow::Error> {
-        let lock = self.conn.lock().unwrap();
+        let lock_result = self.conn.lock();
+        if let Some(e) = lock_result.as_ref().err() {return Some(anyhow!(e.to_string()));}
+        let lock = lock_result.unwrap();
         let update_result = diesel::update(
             tasks.filter(
                 id.eq(tid)
@@ -117,7 +117,10 @@ impl WorkerFetch for TaskpoolImpl {
     }
 
     fn record_proof(&self,  worker_id_arg: String, tid: i64, proof_str: String) -> Option<anyhow::Error> {
-        let lock = self.conn.lock().unwrap();
+        let lock_result = self.conn.lock();
+        if let Some(e) = lock_result.as_ref().err() {return Some(anyhow!(e.to_string()));}
+        let lock = lock_result.unwrap();
+
         let update_result = diesel::update(
             tasks.filter(
                 id.eq(tid)
@@ -144,13 +147,13 @@ impl Common for TaskpoolImpl {
             worker_id: "".to_string(),
             prove_id: prove_id_arg,
             sector_id: sector_id_arg,
-            phase1_output: serde_json::to_string(&phase1_output_arg).unwrap(),
+            phase1_output: serde_json::to_string(&phase1_output_arg)?,
             task_type:0,
             status:TaskStatus::Init.into(),
             create_at: Utc::now().timestamp(),
         };
 
-        let lock = self.conn.lock().unwrap();
+        let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
         let result = insert_into(tasks).values(&new_task).execute(lock.deref());
 
         match result {
@@ -160,7 +163,7 @@ impl Common for TaskpoolImpl {
     }
 
     fn fetch(&self, tid: i64) -> Result<Task> {
-        let lock = self.conn.lock().unwrap();
+        let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
         let result = tasks.find(tid).first(lock.deref());
         match result {
             Ok(val) => Ok(val),
@@ -169,7 +172,7 @@ impl Common for TaskpoolImpl {
     }
 
     fn fetch_undo(&self) -> Result<Vec<Task>> {
-        let lock = self.conn.lock().unwrap();
+        let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
         let result = tasks.filter(status.eq::<i32>(TaskStatus::Init.into()))
             .load(lock.deref());
         match result {
@@ -179,10 +182,10 @@ impl Common for TaskpoolImpl {
     }
 
     fn get_status(&self, tid: i64) -> Result<TaskStatus> {
-        let lock = self.conn.lock().unwrap();
+        let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
         let result: QueryResult::<i32> = tasks.select(status).filter(id.eq(tid)).get_result(lock.deref());
         match result {
-            Ok(val) => Ok(TaskStatus::try_from(val).unwrap()),
+            Ok(val) => Ok(TaskStatus::try_from(val)?),
             Err(e) => Err(anyhow!(e.to_string())),
         }
     }

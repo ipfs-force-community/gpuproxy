@@ -1,12 +1,14 @@
 use c2proxy::config::*;
 use c2proxy::proof_rpc::*;
 use c2proxy::models::*;
+use c2proxy::models::migrations::*;
 use crate::worker::Worker;
 use crate::task_pool::*;
 use log::*;
 use simplelog::*;
 use clap::{App, AppSettings, Arg};
 use std::sync::Arc;
+use std::sync::{Mutex};
 
 fn main() {
     TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
@@ -20,9 +22,9 @@ fn main() {
                 .setting(AppSettings::ArgRequiredElseHelp)
                 .about("c2proxy worker for execte compute task")
                 .args(&[
-                    Arg::new("worker-url")
-                        .long("worker-url")
-                        .env("C2PROXY_WORKER_URL")
+                    Arg::new("c2proxy-url")
+                        .long("c2proxy-url")
+                        .env("C2PROXY_LISTEN_URL")
                         .default_value("127.0.0.1:8888")
                         .help("specify url for connect c2proxy for get task to excute"),
                     Arg::new("db-dsn")
@@ -36,12 +38,13 @@ fn main() {
 
     match app_m.subcommand() {
         Some(("run", ref sub_m)) => {
-            let url: String = sub_m.value_of_t("url").unwrap_or_else(|e| e.exit());
+            let url: String = sub_m.value_of_t("c2proxy-url").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
             let cfg = ClientConfig::new(url, db_dsn);
 
             let db_conn = establish_connection(cfg.db_dsn.as_str());
-            let task_pool = task_pool::TaskpoolImpl::new(db_conn);
+            run_db_migrations(&db_conn).expect("migrations error");
+            let task_pool = task_pool::TaskpoolImpl::new(Mutex::new(db_conn));
             let worker_id = task_pool.get_worker_id().unwrap();
             
             let worker_api =  proof::get_worker_api(cfg.url).unwrap();

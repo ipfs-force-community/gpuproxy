@@ -1,9 +1,9 @@
 pub mod schema;
+pub mod migrations;
 
 use diesel::prelude::*;
 use schema::tasks;
 use schema::worker_infos;
-use std::sync::{Mutex};
 use serde::{Serialize, Deserialize};
 use serde::{Serializer, Deserializer};
 
@@ -50,8 +50,8 @@ pub struct NewWorkerInfo {
     pub worker_id: String,
 }
 
-pub fn establish_connection(conn_string: &str) -> Mutex<SqliteConnection> {
-    Mutex::new(SqliteConnection::establish(conn_string).unwrap_or_else(|_| panic!("Error connecting to {}", conn_string)))
+pub fn establish_connection(conn_string: &str) -> SqliteConnection {
+    SqliteConnection::establish(conn_string).unwrap_or_else(|_| panic!("Error connecting to {}", conn_string))
 }
 
 #[derive(Debug)]
