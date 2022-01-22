@@ -13,9 +13,10 @@ use crate::worker::Worker;
 use crate::task_pool::*;
 use anyhow::{Result};
 use std::sync::{Mutex};
+use std::env;
 
 fn main() {
-    TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
+    TermLogger::init(LevelFilter::Trace, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
 
     let app_m = App::new("c2proxy")
         .version("0.0.1")
@@ -49,6 +50,7 @@ fn main() {
 
     match app_m.subcommand() {
         Some(("run", ref sub_m)) => {
+            env::set_var("BELLMAN_NO_GPU", "1");
             let url: String = sub_m.value_of_t("url").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
             let disable_worker: bool = sub_m.value_of_t("disable-worker").unwrap_or_else(|e| e.exit());

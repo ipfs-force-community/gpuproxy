@@ -2,10 +2,21 @@ package main
 
 import (
 	"context"
-	c2proxy_go "github.com/hunjixin/c2proxy/c2proxy-go"
+	"encoding/json"
+	"io/ioutil"
 	"log"
 	"time"
+
+	"github.com/filecoin-project/go-address"
+	c2proxy_go "github.com/hunjixin/c2proxy/c2proxy-go"
 )
+
+type Commit2In struct {
+	SectorNum  int64
+	Phase1Out  []byte
+	SectorSize uint64
+	Miner      address.Address
+}
 
 func main() {
 	ctx := context.TODO()
@@ -16,7 +27,21 @@ func main() {
 	}
 	defer closer()
 
-	taskId, err := client.SubmitTask([]byte{}, "f01001", [32]byte{}, 10)
+	var commit2In Commit2In
+	eightMiB, err := ioutil.ReadFile("./8MiB.json")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	err = json.Unmarshal(eightMiB, &commit2In)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	var proverId [32]byte
+	copy(proverId[:], commit2In.Miner.Payload())
+	taskId, err := client.SubmitTask(commit2In.Phase1Out, commit2In.Miner.String(), proverId, commit2In.SectorNum)
 	if err != nil {
 		log.Fatal(err)
 		return

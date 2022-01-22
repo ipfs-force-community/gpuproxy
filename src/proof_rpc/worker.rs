@@ -9,7 +9,7 @@ use log::*;
 use hex::FromHex;
 use crossbeam_utils::thread;
 use crossbeam_channel::tick;
-
+use std::thread as stdthread;
 
 pub trait Worker {
     fn seal_commit_phase2(&self,
@@ -18,7 +18,7 @@ pub trait Worker {
                           sector_id: SectorId,
     ) -> Result<SealCommitPhase2Output>;
 
-    fn process_tasks(&self);
+    fn process_tasks(self);
 }
 
 pub struct LocalWorker {
@@ -42,47 +42,53 @@ impl Worker for LocalWorker {
           seal_commit_phase2(phase1_output_arg, prover_id_arg, sector_id_arg)
     }
 
-    fn process_tasks(&self) {
-        info!("worker {} start to worker and wait for new tasks", self.worker_id.clone());
-        let ticker = tick(Duration::from_secs(10));
-        loop {
-            ticker.recv().unwrap();
-            let  count = Arc::new(AtomicUsize::new(0));
-            if count.load(Ordering::SeqCst) >= self.max_task {
-                continue
-            }
-            count.fetch_add(1, Ordering::SeqCst);
-            let result = self.task_pool.fetch_one_todo(self.worker_id.clone());
+    fn process_tasks(self) {
 
-            match result {
-                Ok(undo_task) => {
-                    info!("worker {} got task {} todo", self.worker_id.clone(), undo_task.id);
-                    let count_clone = Arc::clone(&count);
-                    let task_pool = self.task_pool.clone();
-                    thread::scope(|s| {
-                        s.spawn(|_| {
-                            defer! {
-                                count_clone.fetch_sub(1, Ordering::SeqCst);
-                            }
-                            let prover_id_arg: ProverId = FromHex::from_hex(undo_task.prove_id).unwrap();
-                            let sector_id_arg: SectorId = SectorId::from(undo_task.sector_id as u64);
-                            let phase1_output_arg: SealCommitPhase1Output = serde_json::from_str( undo_task.phase1_output.as_str()).unwrap();
-                            match self.seal_commit_phase2(phase1_output_arg, prover_id_arg, sector_id_arg){
-                                Ok(proof_arg) => {
-                                    let base64_proof = base64::encode(proof_arg.proof).to_string();
-                                    task_pool.record_proof(self.worker_id.clone(), undo_task.id, base64_proof);
-                                }
-                                Err(e) => {
-                                    task_pool.record_error(self.worker_id.clone(), undo_task.id, e.to_string());
-                                }
-                            }
-                        });
-                    }).unwrap();
-                },
-                Err(e) => {
-                    error!("unable to fetch undo task {}", e)
+        stdthread::spawn(move ||{
+                info!("worker {} start to worker and wait for new tasks", self.worker_id);
+                let ticker = tick(Duration::from_secs(10));
+                loop {
+                    ticker.recv().unwrap();
+                    let  count = Arc::new(AtomicUsize::new(0));
+                    if count.load(Ordering::SeqCst) >= self.max_task {
+                        continue
+                    }
+                    count.fetch_add(1, Ordering::SeqCst);
+                    let result = self.task_pool.fetch_one_todo(self.worker_id.clone());
+    
+                    match result {
+                        Ok(undo_task) => {
+                            let count_clone = Arc::clone(&count);
+                            let task_pool = self.task_pool.clone();
+                            thread::scope(|s| {
+                                s.spawn(|_| {
+                                    defer! {
+                                        count_clone.fetch_sub(1, Ordering::SeqCst);
+                                    }
+                                    let prover_id_arg: ProverId = FromHex::from_hex(undo_task.prove_id).unwrap();
+                                    let sector_id_arg: SectorId = SectorId::from(undo_task.sector_id as u64);
+                                    let phase1_output_arg: SealCommitPhase1Output = serde_json::from_str( undo_task.phase1_output.as_str()).unwrap();
+                                    info!("worker {} start to do task {}, size {}", self.worker_id.clone(), undo_task.id, u64::from(phase1_output_arg.registered_proof.sector_size()));
+                                    match self.seal_commit_phase2(phase1_output_arg, prover_id_arg, sector_id_arg){
+                                        Ok(proof_arg) => {
+                                            info!("worker {} complted {} success", self.worker_id.clone(), undo_task.id);
+                                            let base64_proof = base64::encode(proof_arg.proof).to_string();
+                                            task_pool.record_proof(self.worker_id.clone(), undo_task.id, base64_proof);
+                                        }
+                                        Err(e) => {
+                                            info!("worker {} execute {} fail reason {}", self.worker_id.clone(), undo_task.id, e.to_string());
+                                            task_pool.record_error(self.worker_id.clone(), undo_task.id, e.to_string());
+                                        }
+                                    }
+                                });
+                            }).unwrap();
+                        },
+                        Err(e) => {
+                            error!("unable to fetch undo task {}", e)
+                        }
+                    }
                 }
-            }
-        }
+            }); 
+        info!("worker has started");
     }
 }

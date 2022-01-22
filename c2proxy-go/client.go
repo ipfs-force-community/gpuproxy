@@ -2,8 +2,9 @@ package c2proxy_go
 
 import (
 	"context"
-	"github.com/filecoin-project/go-jsonrpc"
 	"net/http"
+
+	"github.com/filecoin-project/go-jsonrpc"
 )
 
 type TaskStatus int32
@@ -50,8 +51,8 @@ type C2Proxy interface {
 func NewC2ProxyClient(ctx context.Context, url string) (C2Proxy, jsonrpc.ClientCloser, error) {
 	impl := &C2ProxyStruct{}
 	closer, err := jsonrpc.NewMergeClient(ctx, url, "Proof", []interface{}{
-		impl.C2ProxyWorkerStruct.Internal,
-		impl.C2ProxyClientStruct.Internal,
+		&impl.C2ProxyWorkerStruct.Internal,
+		&impl.C2ProxyClientStruct.Internal,
 	}, http.Header{})
 	if err != nil {
 		return nil, nil, err

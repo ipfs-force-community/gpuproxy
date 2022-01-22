@@ -68,6 +68,7 @@ impl Serialize for Bas64Byte {
         where
             S: Serializer,
     {
+        println!("asdsadsad");
         serializer.serialize_str( base64::encode(&self.0).as_str())
     }
 }
@@ -77,7 +78,7 @@ impl<'de> Deserialize<'de> for Bas64Byte {
         where
             D: Deserializer<'de>,
     {
-        let bytes_str = <&str>::deserialize(deserializer)?;
+        let bytes_str = <String>::deserialize(deserializer)?;
         Ok(Bas64Byte(base64::decode(bytes_str).unwrap()))
     }
 }

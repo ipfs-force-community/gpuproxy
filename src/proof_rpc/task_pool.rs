@@ -155,9 +155,11 @@ impl Common for TaskpoolImpl {
 
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
         let result = insert_into(tasks).values(&new_task).execute(lock.deref());
-
         match result {
-            Ok(val) => Ok(val as i64),
+            Ok(val) => {
+                info!("add task {} from miner {} sector {}", val, miner_arg, sector_id_arg);
+                Ok(val as i64)
+            },
             Err(e) => Err(anyhow!(e.to_string())),
         }
     }
