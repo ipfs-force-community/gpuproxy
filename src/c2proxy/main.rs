@@ -37,6 +37,11 @@ fn main() {
                         .env("C2PROXY_DSN")
                         .default_value("task.db")
                         .help("specify sqlite path to store task"),
+                    Arg::new("max-c2")
+                        .long("max-c2")
+                        .env("C2PROXY_MAX_C2")
+                        .default_value("1")
+                        .help("number of c2 task to run parallelly"),
                     Arg::new("disable-worker")
                         .long("disable-worker")
                         .env("C2PROXY_DISABLE_WORKER")
@@ -52,9 +57,10 @@ fn main() {
         Some(("run", ref sub_m)) => {
             env::set_var("BELLMAN_NO_GPU", "1");
             let url: String = sub_m.value_of_t("url").unwrap_or_else(|e| e.exit());
+            let max_c2: usize = sub_m.value_of_t("max-c2").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
             let disable_worker: bool = sub_m.value_of_t("disable-worker").unwrap_or_else(|e| e.exit());
-            let cfg = ServiceConfig::new(url, db_dsn, disable_worker);
+            let cfg = ServiceConfig::new(url, db_dsn, max_c2, disable_worker);
             run_cfg(cfg).unwrap().wait();
         } // run was used
         _ => {} // Either no subcommand or one not tested for...
@@ -68,7 +74,7 @@ fn run_cfg(cfg: ServiceConfig) -> Result<Server> {
     let worker_id = task_pool.get_worker_id()?;
 
     let arc_pool = Arc::new(task_pool);
-    let worker = worker::LocalWorker::new(worker_id.to_string(), arc_pool.clone());
+    let worker = worker::LocalWorker::new(cfg.max_c2, worker_id.to_string(), arc_pool.clone());
 
    let io = proof::register(arc_pool);
     if !cfg.disable_worker {

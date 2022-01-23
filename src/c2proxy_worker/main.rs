@@ -32,6 +32,11 @@ fn main() {
                         .env("C2PROXY_DSN")
                         .default_value("task.db")
                         .help("specify sqlite path to store task"),
+                    Arg::new("max-c2")
+                        .long("max-c2")
+                        .env("C2PROXY_MAX_C2")
+                        .default_value("1")
+                        .help("number of c2 task to run parallelly"),
                 ]),
         )
         .get_matches();
@@ -39,8 +44,9 @@ fn main() {
     match app_m.subcommand() {
         Some(("run", ref sub_m)) => {
             let url: String = sub_m.value_of_t("c2proxy-url").unwrap_or_else(|e| e.exit());
+            let max_c2: usize = sub_m.value_of_t("max-c2").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
-            let cfg = ClientConfig::new(url, db_dsn);
+            let cfg = ClientConfig::new(url, db_dsn, max_c2);
 
             let db_conn = establish_connection(cfg.db_dsn.as_str());
             run_db_migrations(&db_conn).expect("migrations error");
@@ -48,7 +54,7 @@ fn main() {
             let worker_id = task_pool.get_worker_id().unwrap();
             
             let worker_api =  proof::get_worker_api(cfg.url).unwrap();
-            let worker = worker::LocalWorker::new(worker_id.to_string(), Arc::new(worker_api));
+            let worker = worker::LocalWorker::new(cfg.max_c2, worker_id.to_string(), Arc::new(worker_api));
             let join_handle = worker.process_tasks();
             info!("ready for local worker address worker_id {}", worker_id);
             join_handle.join().unwrap();
