@@ -46,15 +46,14 @@ impl Worker for LocalWorker {
     }
 
     fn fetch_one_todo(&self) -> Result<Task> {
-        info!("xxx1");
         let uncomplete_task_result = self.task_pool.fetch_uncomplte(self.worker_id.clone());
         if let Ok(uncomplete_tasks) = uncomplete_task_result {
             if uncomplete_tasks.len() > 0 {
-                info!("xxx2");
-               return Ok(uncomplete_tasks[0].clone());
+                let fetch_work = uncomplete_tasks[0].clone();
+                info!("worker {} fetch uncomplete task {}", self.worker_id, fetch_work.id);
+                return Ok(fetch_work);
             }
         }
-        info!("xxx3");
         self.task_pool.fetch_one_todo(self.worker_id.clone())
     }
     fn process_tasks(self) {

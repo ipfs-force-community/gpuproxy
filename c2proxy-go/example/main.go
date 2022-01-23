@@ -28,7 +28,7 @@ func main() {
 	defer closer()
 
 	var commit2In Commit2In
-	eightMiB, err := ioutil.ReadFile("./8MiB.json")
+	eightMiB, err := ioutil.ReadFile("./2KiB.json")
 	if err != nil {
 		log.Fatal(err)
 		return
