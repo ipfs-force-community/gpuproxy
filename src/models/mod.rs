@@ -10,7 +10,7 @@ use serde::{Serializer, Deserializer};
 #[derive(Debug, Clone, Serialize, Deserialize, Identifiable,Queryable)]
 #[serde(rename_all = "camelCase")]
 pub struct Task {
-    pub id: i64,
+    pub id: String,
     pub miner: String,
     pub prove_id: String,
     pub sector_id: i64,
@@ -28,6 +28,7 @@ pub struct Task {
 #[derive(Debug, Insertable)]
 #[table_name = "tasks"]
 pub struct NewTask {
+    pub id: String,
     pub miner: String,
     pub prove_id: String,
     pub sector_id: i64,
@@ -40,14 +41,13 @@ pub struct NewTask {
 
 #[derive(Debug, Serialize, Deserialize,Queryable)]
 pub struct WorkerInfo {
-    pub id: i64,
-    pub worker_id: String,
+    pub id: String,
 }
 
 #[derive(Debug, Insertable)]
 #[table_name = "worker_infos"]
 pub struct NewWorkerInfo {
-    pub worker_id: String,
+    pub id: String,
 }
 
 pub fn establish_connection(conn_string: &str) -> SqliteConnection {

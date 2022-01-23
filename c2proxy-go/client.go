@@ -18,7 +18,7 @@ const (
 )
 
 type Task struct {
-	Id           int64
+	Id           string
 	Miner        string
 	ProveId      string
 	SectorId     int64
@@ -34,13 +34,13 @@ type Task struct {
 }
 type C2ProxyWorker interface {
 	FetchTodo(workerId string) (Task, error)
-	RecordProof(workerId string, tid int64, proof string) (bool, error)
-	RecordError(workerId string, tid int64, errMsg string) (bool, error)
+	RecordProof(workerId string, tid string, proof string) (bool, error)
+	RecordError(workerId string, tid string, errMsg string) (bool, error)
 }
 
 type C2ProxyClient interface {
-	SubmitTask(phase1_output []byte, miner string, prover_id [32]byte, sector_id int64) (int64, error)
-	GetTask(id int64) (Task, error)
+	SubmitTask(phase1_output []byte, miner string, prover_id [32]byte, sector_id int64) (string, error)
+	GetTask(id string) (Task, error)
 }
 
 type C2Proxy interface {

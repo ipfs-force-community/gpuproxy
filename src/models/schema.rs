@@ -1,6 +1,6 @@
 table! {
     tasks (id) {
-        id -> BigInt,
+        id -> Text,
         miner -> Text,
         prove_id -> Text,
         sector_id -> BigInt,
@@ -19,8 +19,7 @@ table! {
 
 table! {
     worker_infos (id) {
-        id -> BigInt,
-        worker_id -> Text,
+        id -> Text,
     }
 }
 

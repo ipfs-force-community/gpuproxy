@@ -49,8 +49,9 @@ fn main() {
             
             let worker_api =  proof::get_worker_api(cfg.url).unwrap();
             let worker = worker::LocalWorker::new(worker_id.to_string(), Arc::new(worker_api));
-            worker.process_tasks();
+            let join_handle = worker.process_tasks();
             info!("ready for local worker address worker_id {}", worker_id);
+            join_handle.join().unwrap();
         } // run was used
         _ => {} // Either no subcommand or one not tested for...
     }

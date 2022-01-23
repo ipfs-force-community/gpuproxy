@@ -1,5 +1,5 @@
 CREATE TABLE tasks (
-                       id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                       id TEXT(256) NOT NULL PRIMARY KEY,
                        miner TEXT(256) NOT NULL,
                        prove_id TEXT(256) NOT NULL,
                        sector_id INTEGER NOT NULL,
@@ -15,7 +15,5 @@ CREATE TABLE tasks (
 );
 
 CREATE TABLE worker_infos (
-                       id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                       worker_id TEXT(256) NOT NULL
-                    
+                       id TEXT(256) NOT NULL PRIMARY KEY       
 );

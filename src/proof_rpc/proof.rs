@@ -18,10 +18,10 @@ pub trait ProofRpc {
                   miner: String,
                   prover_id: ProverId,
                   sector_id: i64,
-    ) -> Result<i64>;
+    ) -> Result<String>;
 
     #[rpc(name = "Proof.GetTask")]
-    fn get_task(&self, id: i64) -> Result<Task>;
+    fn get_task(&self, id: String) -> Result<Task>;
 
     #[rpc(name = "Proof.FetchTodo")]
     fn fetch_todo(&self, worker_id_arg: String) -> Result<Task> ;
@@ -30,10 +30,10 @@ pub trait ProofRpc {
     fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>>;
 
     #[rpc(name = "Proof.RecordProof")]
-    fn record_proof(&self, worker_id_arg: String, tid: i64, proof: String) -> Result<bool>;
+    fn record_proof(&self, worker_id_arg: String, tid: String, proof: String) -> Result<bool>;
 
     #[rpc(name = "Proof.RecordError")]
-    fn record_error(&self, worker_id_arg: String, tid: i64, err_msg: String) -> Result<bool>;
+    fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String) -> Result<bool>;
 
 }
 
@@ -47,15 +47,14 @@ impl ProofRpc for ProofImpl {
           miner: String,
           prover_id: ProverId,
           sector_id: i64,
-    ) -> Result<i64> {
-
+    ) -> Result<String> {
         let scp1o = serde_json::from_slice(Into::<Vec<u8>>::into(phase1_output).as_slice()).unwrap();
         let addr = forest_address::Address::from_str(miner.as_str()).unwrap();
         let hex_prover_id = hex::encode(prover_id);
         Ok(self.pool.add(addr, hex_prover_id, sector_id, scp1o).unwrap())
     }
 
-    fn get_task(&self, id: i64) -> Result<Task> {
+    fn get_task(&self, id: String) -> Result<Task> {
         Ok(self.pool.fetch(id).unwrap())
     }
 
@@ -67,7 +66,7 @@ impl ProofRpc for ProofImpl {
         Ok(self.pool.fetch_uncomplte(worker_id_arg).unwrap())
     }
     
-    fn record_error(&self, worker_id_arg: String, tid: i64, err_msg: String) -> Result<bool> {
+    fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String) -> Result<bool> {
       match  self.pool.record_error(worker_id_arg, tid, err_msg) {
           Some(val) => Err(
             Error{
@@ -80,7 +79,7 @@ impl ProofRpc for ProofImpl {
       }
     }
 
-    fn record_proof(&self, worker_id_arg: String, tid: i64, proof: String) -> Result<bool> {
+    fn record_proof(&self, worker_id_arg: String, tid: String, proof: String) -> Result<bool> {
         match  self.pool.record_proof(worker_id_arg, tid, proof) {
             Some(val) => Err(
               Error{
@@ -135,14 +134,14 @@ impl WorkerFetch for WrapClient{
         }
     }
 
-     fn record_error(&self, worker_id: String, tid: i64, err_msg: String) -> Option<anyhow::Error> {
+     fn record_error(&self, worker_id: String, tid: String, err_msg: String) -> Option<anyhow::Error> {
          match jsonrpc_core::futures_executor::block_on(self.client.record_error(worker_id, tid, err_msg)) {
              Ok(_)=> None,
              Err(e)=>Some(anyhow!(e.to_string()))
          }
     }
 
-     fn record_proof(&self, worker_id: String, tid: i64, proof: String) -> Option<anyhow::Error> {
+     fn record_proof(&self, worker_id: String, tid: String, proof: String) -> Option<anyhow::Error> {
          match jsonrpc_core::futures_executor::block_on(self.client.record_proof(worker_id, tid, proof)) {
              Ok(_)=> None,
              Err(e)=>Some(anyhow!(e.to_string()))

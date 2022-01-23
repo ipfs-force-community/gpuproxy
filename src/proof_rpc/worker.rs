@@ -21,7 +21,7 @@ pub trait Worker {
 
     fn fetch_one_todo(&self) ->Result<Task>;
 
-    fn process_tasks(self);
+    fn process_tasks(self) -> stdthread::JoinHandle<()>;
 }
 
 pub struct LocalWorker {
@@ -56,8 +56,9 @@ impl Worker for LocalWorker {
         }
         self.task_pool.fetch_one_todo(self.worker_id.clone())
     }
-    fn process_tasks(self) {
-        stdthread::spawn(move ||{
+    
+    fn process_tasks(self) -> stdthread::JoinHandle<()>{
+       let handler =  stdthread::spawn(move ||{
                 info!("worker {} start to worker and wait for new tasks", self.worker_id);
                 let ticker = tick(Duration::from_secs(10));
                 loop {
@@ -102,5 +103,6 @@ impl Worker for LocalWorker {
                 }
             }); 
         info!("worker has started");
+        handler
     }
 }

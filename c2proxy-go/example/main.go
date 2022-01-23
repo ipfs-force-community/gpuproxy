@@ -54,7 +54,8 @@ func main() {
 			return
 		}
 		if task.Status == c2proxy_go.Completed {
-
+			log.Println("task ", task.Id, " has been complete by ", task.WorkerId)
+			break
 		}
 		time.Sleep(time.Second * 5)
 	}
