@@ -29,6 +29,7 @@ pub trait WorkerApi {
 
 pub trait WorkerFetch {
     fn fetch_one_todo(&self,  worker_id_arg: String) -> Result<Task>;
+    fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>>;
     fn record_error(&self,  worker_id_arg: String, tid: i64,   err_msg: String) -> Option<anyhow::Error>;
     fn record_proof(&self,  worker_id_arg: String, tid: i64, proof: String) -> Option<anyhow::Error>;
 }
@@ -80,8 +81,7 @@ impl WorkerApi for TaskpoolImpl {
 impl WorkerFetch for TaskpoolImpl {
     fn fetch_one_todo(&self, worker_id_arg: String) -> Result<Task> {
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        let predicate = status.eq::<i32>(TaskStatus::Init.into());
-        let result: Task = tasks.filter(&predicate).first(lock.deref())?;
+        let result: Task = tasks.filter(status.eq::<i32>(TaskStatus::Init.into())).first(lock.deref())?;
         let update_result = diesel::update(tasks.filter(id.eq(result.id))).set((
             status.eq::<i32>(TaskStatus::Running.into()),
             worker_id.eq(worker_id_arg.clone()),
@@ -90,6 +90,20 @@ impl WorkerFetch for TaskpoolImpl {
         info!("worker {} fetch {} to do", worker_id_arg, result.id);
         match update_result {
             Ok(_) => Ok(result),
+            Err(e) => Err(anyhow!(e.to_string())),
+        }
+    }
+
+    fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>>{
+        let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
+        let result = tasks.filter(
+            worker_id.eq(worker_id_arg).and(
+                status.eq::<i32>(TaskStatus::Running.into())
+            )
+        )
+            .load(lock.deref());
+        match result {
+            Ok(val) => Ok(val),
             Err(e) => Err(anyhow!(e.to_string())),
         }
     }

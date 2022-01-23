@@ -7,7 +7,7 @@ use schema::worker_infos;
 use serde::{Serialize, Deserialize};
 use serde::{Serializer, Deserializer};
 
-#[derive(Debug, Serialize, Deserialize, Identifiable,Queryable)]
+#[derive(Debug, Clone, Serialize, Deserialize, Identifiable,Queryable)]
 #[serde(rename_all = "camelCase")]
 pub struct Task {
     pub id: i64,

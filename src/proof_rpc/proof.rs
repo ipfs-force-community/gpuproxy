@@ -26,6 +26,9 @@ pub trait ProofRpc {
     #[rpc(name = "Proof.FetchTodo")]
     fn fetch_todo(&self, worker_id_arg: String) -> Result<Task> ;
 
+    #[rpc(name = "Proof.FetchUncomplete")]
+    fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>>;
+
     #[rpc(name = "Proof.RecordProof")]
     fn record_proof(&self, worker_id_arg: String, tid: i64, proof: String) -> Result<bool>;
 
@@ -60,6 +63,9 @@ impl ProofRpc for ProofImpl {
         Ok(self.pool.fetch_one_todo(worker_id_arg).unwrap())
     }
 
+    fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>>{
+        Ok(self.pool.fetch_uncomplte(worker_id_arg).unwrap())
+    }
     
     fn record_error(&self, worker_id_arg: String, tid: i64, err_msg: String) -> Result<bool> {
       match  self.pool.record_error(worker_id_arg, tid, err_msg) {
@@ -117,6 +123,13 @@ impl WrapClient {
 impl WorkerFetch for WrapClient{
     fn fetch_one_todo(&self, worker_id: String) -> anyhow::Result<Task> {
         match jsonrpc_core::futures_executor::block_on(self.client.fetch_todo(worker_id)) {
+            Ok(t)=>Ok(t),
+            Err(e)=>Err(anyhow!(e.to_string()))
+        }
+    }
+
+    fn fetch_uncomplte(&self, worker_id_arg: String) -> anyhow:: Result<Vec<Task>> {
+        match jsonrpc_core::futures_executor::block_on(self.client.fetch_uncomplte(worker_id_arg)) {
             Ok(t)=>Ok(t),
             Err(e)=>Err(anyhow!(e.to_string()))
         }
