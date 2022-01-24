@@ -30,7 +30,7 @@ fn main() {
                     Arg::new("db-dsn")
                         .long("db-dsn")
                         .env("C2PROXY_DSN")
-                        .default_value("task.db")
+                        .default_value("c2proxy-worker.db")
                         .help("specify sqlite path to store task"),
                     Arg::new("max-c2")
                         .long("max-c2")
