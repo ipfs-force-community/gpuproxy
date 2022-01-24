@@ -50,15 +50,15 @@ impl Worker for LocalWorker {
                 let count = Arc::new(AtomicUsize::new(0));
                 loop {
                     ticker.recv().unwrap();
-                    if count.load(Ordering::SeqCst) >= self.max_task {
-                        info!("has reach the max number of c2 tasks");
+                    let cur_size = count.load(Ordering::SeqCst);
+                    if  cur_size  >= self.max_task {
+                        info!("has reach the max number of c2 tasks {} {}", cur_size, self.max_task);
                         continue
                     }
-                    count.fetch_add(1, Ordering::SeqCst);
-
                     match self.fetch_one_todo() {
                         Ok(undo_task) => {
-                            let count_clone = Arc::clone(&count);
+                            count.fetch_add(1, Ordering::SeqCst);
+                            let count_clone = count.clone();
                             let task_pool = self.task_pool.clone();
                             let worker_id = self.worker_id.clone();
                             stdthread::spawn(move|| {
