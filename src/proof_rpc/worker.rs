@@ -6,6 +6,7 @@ use std::time::Duration;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::proof_rpc::task_pool::*;
 use crate::models::*;
+use crate::proof_rpc::resource::{*};
 use log::*;
 use hex::FromHex;
 use crossbeam_channel::tick;
@@ -20,14 +21,15 @@ pub trait Worker {
 pub struct LocalWorker {
     pub worker_id: String,
     pub max_task: usize,
-    pub task_pool:  Arc<dyn WorkerFetch+ Send + Sync>
+    pub task_pool:  Arc<dyn WorkerFetch+ Send + Sync>,
+    pub resource:  Arc<dyn Resource+ Send + Sync>,
 }
 
 unsafe impl Send for LocalWorker {}
 
 impl LocalWorker{
-    pub fn new(max_task: usize, worker_id: String, task_pool:  Arc<dyn WorkerFetch+ Send + Sync>) -> Self {
-        LocalWorker { worker_id, max_task, task_pool }
+    pub fn new(max_task: usize, worker_id: String, resource: Arc<dyn Resource+ Send + Sync>, task_pool:  Arc<dyn WorkerFetch+ Send + Sync>) -> Self {
+        LocalWorker { worker_id, max_task, task_pool, resource}
     }
 }
 
@@ -61,25 +63,34 @@ impl Worker for LocalWorker {
                             let count_clone = count.clone();
                             let task_pool = self.task_pool.clone();
                             let worker_id = self.worker_id.clone();
+                            let resource_result = self.resource.get_resource_info(undo_task.resource_id.clone());
+                            if let Err(e) = resource_result {
+                                error!("unable to get resource of {}, reason:{}", undo_task.resource_id, e.to_string());
+                                continue
+                            }
+                            let resource =  resource_result.unwrap();
                             stdthread::spawn(move|| {
                                 defer! {
                                     count_clone.fetch_sub(1, Ordering::SeqCst);
                                 }
-                                let prover_id_arg: ProverId = FromHex::from_hex(undo_task.prove_id).unwrap();
-                                let sector_id_arg: SectorId = SectorId::from(undo_task.sector_id as u64);
-                                let phase1_output_arg: SealCommitPhase1Output = serde_json::from_str( undo_task.phase1_output.as_str()).unwrap();
-                                info!("worker {} start to do task {}, size {}", worker_id.clone(), undo_task.id, u64::from(phase1_output_arg.registered_proof.sector_size()));
-                                match seal_commit_phase2(phase1_output_arg, prover_id_arg, sector_id_arg){
-                                    Ok(proof_arg) => {
-                                        info!("worker {} complted {} success", worker_id.clone(), undo_task.id);
-                                        let base64_proof = base64::encode(proof_arg.proof).to_string();
-                                        task_pool.record_proof(worker_id.clone(), undo_task.id, base64_proof);
-                                    }
-                                    Err(e) => {
-                                        info!("worker {} execute {} fail reason {}", worker_id.clone(), undo_task.id, e.to_string());
-                                        task_pool.record_error(worker_id.clone(), undo_task.id, e.to_string());
+
+                                if undo_task.task_type == 0 {
+
+                                    let c2: C2 = serde_json::from_slice( &resource).unwrap();
+                                    info!("worker {} start to do task {}, size {}", worker_id.clone(), undo_task.id, u64::from(c2.phase1_output.registered_proof.sector_size()));
+                                    match seal_commit_phase2(c2.phase1_output, c2.prove_id, c2.sector_id,){
+                                        Ok(proof_arg) => {
+                                            info!("worker {} complted {} success", worker_id.clone(), undo_task.id);
+                                            let base64_proof = base64::encode(proof_arg.proof).to_string();
+                                            task_pool.record_proof(worker_id.clone(), undo_task.id, base64_proof);
+                                        }
+                                        Err(e) => {
+                                            info!("worker {} execute {} fail reason {}", worker_id.clone(), undo_task.id, e.to_string());
+                                            task_pool.record_error(worker_id.clone(), undo_task.id, e.to_string());
+                                        }
                                     }
                                 }
+
                             });
                             
                         },

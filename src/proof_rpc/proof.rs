@@ -1,7 +1,8 @@
 use std::str::FromStr;
-use filecoin_proofs_api::{ProverId};
+use filecoin_proofs_api::{ProverId, SectorId};
 use crate::proof_rpc::task_pool::*;
 use crate::models::{Task, Bas64Byte};
+use crate::proof_rpc::resource;
 use jsonrpc_core::{Result,Error, ErrorCode};
 use jsonrpc_derive::rpc;
 
@@ -17,7 +18,7 @@ pub trait ProofRpc {
                   phase1_output: Bas64Byte,
                   miner: String,
                   prover_id: ProverId,
-                  sector_id: i64,
+                  sector_id: u64,
     ) -> Result<String>;
 
     #[rpc(name = "Proof.GetTask")]
@@ -29,6 +30,9 @@ pub trait ProofRpc {
     #[rpc(name = "Proof.FetchUncomplete")]
     fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>>;
 
+    #[rpc(name = "Proof.GetResourceInfo")]
+    fn get_resource_info(&self, resource_id_arg: String) -> Result<Vec<u8>>;
+
     #[rpc(name = "Proof.RecordProof")]
     fn record_proof(&self, worker_id_arg: String, tid: String, proof: String) -> Result<bool>;
 
@@ -38,7 +42,8 @@ pub trait ProofRpc {
 }
 
 pub struct ProofImpl {
-    pool: Arc<dyn Taskpool+ Send + Sync>
+    resource: Arc<dyn resource::Resource+ Send + Sync>,
+    pool: Arc<dyn Taskpool+ Send + Sync>,
 }
 
 impl ProofRpc for ProofImpl {
@@ -46,12 +51,19 @@ impl ProofRpc for ProofImpl {
           phase1_output: Bas64Byte,
           miner: String,
           prover_id: ProverId,
-          sector_id: i64,
+          sector_id: u64,
     ) -> Result<String> {
         let scp1o = serde_json::from_slice(Into::<Vec<u8>>::into(phase1_output).as_slice()).unwrap();
         let addr = forest_address::Address::from_str(miner.as_str()).unwrap();
-        let hex_prover_id = hex::encode(prover_id);
-        Ok(self.pool.add(addr, hex_prover_id, sector_id, scp1o).unwrap())
+        let c2_resurce = resource::C2{
+            prove_id: prover_id,
+            sector_id: SectorId::from(sector_id),
+            phase1_output: scp1o,
+        };
+        let  resource_bytes = serde_json::to_vec(&c2_resurce).unwrap();
+        let resource_id = self.resource.store_resource_info(resource_bytes).unwrap();
+        let tid = self.pool.addTask(addr, resource_id).unwrap();
+        Ok(tid)
     }
 
     fn get_task(&self, id: String) -> Result<Task> {
@@ -65,7 +77,11 @@ impl ProofRpc for ProofImpl {
     fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>>{
         Ok(self.pool.fetch_uncomplte(worker_id_arg).unwrap())
     }
-    
+
+    fn get_resource_info(&self, resource_id_arg: String) -> Result<Vec<u8>>{
+        Ok(self.resource.get_resource_info(resource_id_arg).unwrap())
+    }
+
     fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String) -> Result<bool> {
       match  self.pool.record_error(worker_id_arg, tid, err_msg) {
           Some(val) => Err(
@@ -93,9 +109,9 @@ impl ProofRpc for ProofImpl {
     }
 }
 
-pub fn register(pool:  Arc<dyn Taskpool+ Send + Sync>) -> IoHandler {
+pub fn register(resource: Arc<dyn resource::Resource+ Send + Sync>, pool:  Arc<dyn Taskpool+ Send + Sync>) -> IoHandler {
     let mut io = IoHandler::default();
-    let proof_impl = ProofImpl {pool};
+    let proof_impl = ProofImpl {resource, pool};
     io.extend_with(proof_impl.to_delegate());
     io 
 }
@@ -116,6 +132,19 @@ impl WrapClient {
         return WrapClient{
             client
         }
+    }
+}
+
+impl resource::Resource for WrapClient {
+    fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Vec<u8>> {
+        match jsonrpc_core::futures_executor::block_on(self.client.get_resource_info(resource_id_arg)) {
+            Ok(t)=>Ok(t),
+            Err(e)=>Err(anyhow!(e.to_string()))
+        }
+    }
+
+    fn store_resource_info(&self, _: Vec<u8>) -> anyhow::Result<String> {
+       Err(anyhow!("not support set resource in worker"))
     }
 }
 
@@ -147,4 +176,9 @@ impl WorkerFetch for WrapClient{
              Err(e)=>Some(anyhow!(e.to_string()))
          }
     }
+}
+
+pub enum ResourceOp {
+    File(resource::FileResource),
+    Db(TaskpoolImpl),
 }

@@ -1,7 +1,9 @@
 use std::ops::Deref;
-use crate::models::{NewTask, Task, WorkerInfo, NewWorkerInfo};
-use crate::models::schema::tasks::dsl::*;
-use crate::models::schema::tasks::*;
+use crate::models::{NewTask, Task, WorkerInfo, ResourceInfo,NewWorkerInfo};
+use crate::models::schema::tasks::dsl as tasks_dsl;
+use crate::models::schema::worker_infos::dsl as worker_infos_dsl;
+use crate::models::schema::resource_infos::dsl as resource_infos_dsl;
+use crate::proof_rpc::resource::{*};
 use std::sync::{Mutex};
 use diesel::insert_into;
 use diesel::prelude::*;
@@ -12,7 +14,6 @@ use anyhow::{anyhow, Result};
 use chrono::Utc;
 use log::info;
 use uuid::Uuid;
-use crate::models::schema::worker_infos::dsl::worker_infos;
 
 #[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(i32)]
@@ -36,7 +37,7 @@ pub trait WorkerFetch {
 }
 
 pub trait Common {
-    fn add(&self, miner_arg: forest_address::Address, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: SealCommitPhase1Output) -> Result<String>;
+    fn addTask(&self, miner_arg: forest_address::Address, resource_id: String) -> Result<String>;
     fn fetch(&self, tid: String) -> Result<Task>;
     fn fetch_undo(&self) -> Result<Vec<Task>>;
     fn get_status(&self, tid: String) -> Result<TaskStatus>;
@@ -62,17 +63,17 @@ unsafe impl Sync for TaskpoolImpl {}
 impl WorkerApi for TaskpoolImpl {
     fn get_worker_id(&self) -> Result<uuid::Uuid> {
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        let row_count: i64 =  worker_infos.count().get_result(lock.deref())?;
+        let row_count: i64 =  worker_infos_dsl::worker_infos.count().get_result(lock.deref())?;
         if row_count == 0 {
            let uid =  uuid::Uuid::new_v4();
             let new_worker_info = NewWorkerInfo{
                 id: uid.to_string(),
             };
-            let result = insert_into(worker_infos).values(&new_worker_info).execute(lock.deref())?;
+            let result = insert_into(worker_infos_dsl::worker_infos).values(&new_worker_info).execute(lock.deref())?;
             info!("create worker id {}", result);
            Ok(uid)
         } else {
-            let worker_info: WorkerInfo =  worker_infos.first(lock.deref())?;
+            let worker_info: WorkerInfo = worker_infos_dsl::worker_infos.first(lock.deref())?;
             let load_worker_id = Uuid::parse_str(worker_info.id.as_str())?;
             info!("load worker id {}", load_worker_id.to_string());
             Ok(load_worker_id)
@@ -82,12 +83,13 @@ impl WorkerApi for TaskpoolImpl {
 
 impl WorkerFetch for TaskpoolImpl {
     fn fetch_one_todo(&self, worker_id_arg: String) -> Result<Task> {
+
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        let result: Task = tasks.filter(status.eq::<i32>(TaskStatus::Init.into())).first(lock.deref())?;
-        let update_result = diesel::update(tasks.filter(id.eq(result.id.clone()))).set((
-            status.eq::<i32>(TaskStatus::Running.into()),
-            worker_id.eq(worker_id_arg.clone()),
-            start_at.eq(Utc::now().timestamp()),
+        let result: Task = tasks_dsl::tasks.filter(tasks_dsl::status.eq::<i32>(TaskStatus::Init.into())).first(lock.deref())?;
+        let update_result = diesel::update(tasks_dsl::tasks.filter(tasks_dsl::id.eq(result.id.clone()))).set((
+            tasks_dsl::status.eq::<i32>(TaskStatus::Running.into()),
+            tasks_dsl::worker_id.eq(worker_id_arg.clone()),
+            tasks_dsl:: start_at.eq(Utc::now().timestamp()),
         )).execute(lock.deref());
         info!("worker {} fetch {} to do", worker_id_arg, result.id);
         match update_result {
@@ -98,9 +100,9 @@ impl WorkerFetch for TaskpoolImpl {
 
     fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>>{
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        let result = tasks.filter(
-            worker_id.eq(worker_id_arg).and(
-                status.eq::<i32>(TaskStatus::Running.into())
+        let result = tasks_dsl::tasks.filter(
+            tasks_dsl::worker_id.eq(worker_id_arg).and(
+                tasks_dsl::status.eq::<i32>(TaskStatus::Running.into())
             )
         )
             .load(lock.deref());
@@ -115,14 +117,14 @@ impl WorkerFetch for TaskpoolImpl {
         if let Some(e) = lock_result.as_ref().err() {return Some(anyhow!(e.to_string()));}
         let lock = lock_result.unwrap();
         let update_result = diesel::update(
-            tasks.filter(
-                id.eq(tid.clone())
+            tasks_dsl::tasks.filter(
+                tasks_dsl::id.eq(tid.clone())
             )
         ).set(
             (
-                    status.eq::<i32>(TaskStatus::Error.into()),
-                    worker_id.eq(worker_id_arg.clone()),
-                    error_msg.eq(err_msg_str.clone()),
+                tasks_dsl::status.eq::<i32>(TaskStatus::Error.into()),
+                tasks_dsl::worker_id.eq(worker_id_arg.clone()),
+                tasks_dsl::error_msg.eq(err_msg_str.clone()),
                    )
             ).execute(lock.deref());
         info!("worker {} mark task {} as error reason:{}", worker_id_arg, tid, err_msg_str);
@@ -138,13 +140,13 @@ impl WorkerFetch for TaskpoolImpl {
         let lock = lock_result.unwrap();
 
         let update_result = diesel::update(
-            tasks.filter(
-                id.eq(tid.clone())
+            tasks_dsl::tasks.filter(
+                tasks_dsl::id.eq(tid.clone())
                     )
         ).set(
-            (status.eq::<i32>(TaskStatus::Completed.into()),
-                         worker_id.eq(worker_id_arg.clone()),
-                         proof.eq(proof_str),
+            (tasks_dsl::status.eq::<i32>(TaskStatus::Completed.into()),
+             tasks_dsl::worker_id.eq(worker_id_arg.clone()),
+             tasks_dsl::proof.eq(proof_str),
                     )
         ).execute(lock.deref());
         info!("worker {} complete task {} successfully", worker_id_arg, tid);
@@ -156,26 +158,23 @@ impl WorkerFetch for TaskpoolImpl {
 }
 
 impl Common for TaskpoolImpl {
-    fn add(&self, miner_arg: forest_address::Address, prove_id_arg: String, sector_id_arg: i64,  phase1_output_arg: SealCommitPhase1Output,) -> Result<String> {
+    fn addTask(&self, miner_arg: forest_address::Address, resource_id: String) -> Result<String> {
         let miner_noprefix = &miner_arg.to_string()[1..];
         let new_task_id =  Uuid::new_v4().to_string();
         let new_task = NewTask{
             id: new_task_id.clone(),
             miner: miner_noprefix.to_string(),
+            resource_id: resource_id.clone(),
             worker_id: "".to_string(),
-            prove_id: prove_id_arg,
-            sector_id: sector_id_arg,
-            phase1_output: serde_json::to_string(&phase1_output_arg)?,
             task_type:0,
             status:TaskStatus::Init.into(),
             create_at: Utc::now().timestamp(),
         };
 
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        let result = insert_into(tasks).values(&new_task).execute(lock.deref());
+        let result = insert_into(tasks_dsl::tasks).values(&new_task).execute(lock.deref());
         match result {
             Ok(_) => {
-                info!("add task {} from miner {} sector {}", new_task_id, miner_arg, sector_id_arg);
                 Ok(new_task_id)
             },
             Err(e) => Err(anyhow!(e.to_string())),
@@ -184,7 +183,7 @@ impl Common for TaskpoolImpl {
 
     fn fetch(&self, tid: String) -> Result<Task> {
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        let result = tasks.find(tid).first(lock.deref());
+        let result = tasks_dsl::tasks.find(tid).first(lock.deref());
         match result {
             Ok(val) => Ok(val),
             Err(e) => Err(anyhow!(e.to_string())),
@@ -193,7 +192,7 @@ impl Common for TaskpoolImpl {
 
     fn fetch_undo(&self) -> Result<Vec<Task>> {
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        let result = tasks.filter(status.eq::<i32>(TaskStatus::Init.into()))
+        let result = tasks_dsl::tasks.filter(tasks_dsl::status.eq::<i32>(TaskStatus::Init.into()))
             .load(lock.deref());
         match result {
             Ok(val) => Ok(val),
@@ -203,20 +202,20 @@ impl Common for TaskpoolImpl {
 
     fn get_status(&self, tid: String) -> Result<TaskStatus> {
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        let result: QueryResult::<i32> = tasks.select(status).filter(id.eq(tid)).get_result(lock.deref());
+        let result: QueryResult::<i32> = tasks_dsl::tasks.select(tasks_dsl::status).filter(tasks_dsl::id.eq(tid)).get_result(lock.deref());
         match result {
             Ok(val) => Ok(TaskStatus::try_from(val)?),
             Err(e) => Err(anyhow!(e.to_string())),
         }
     }
     fn list_task(&self, worker_id_opt: Option<String>, state_cod: Option<Vec<i32>>) -> Result<Vec<Task>> {
-        let mut query =  tasks.into_boxed();
+        let mut query =  tasks_dsl::tasks.into_boxed();
         if let Some(worker_id_arg) = worker_id_opt {
-            query = query.filter(worker_id.eq(worker_id_arg));
+            query = query.filter(tasks_dsl::worker_id.eq(worker_id_arg));
         }
 
         if let Some(state_arg) = state_cod {
-            query = query.filter(status.eq_any(state_arg));
+            query = query.filter(tasks_dsl::status.eq_any(state_arg));
         }
 
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
@@ -227,6 +226,31 @@ impl Common for TaskpoolImpl {
         }
     }
 }
+
+impl Resource for TaskpoolImpl {
+    fn get_resource_info(&self, resource_id: String) -> Result<Vec<u8>> {
+        let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
+        let result = resource_infos_dsl::resource_infos.filter(resource_infos_dsl::id.eq(resource_id)).first(lock.deref());
+        match result {
+            Ok::<ResourceInfo,_>(val) => Ok(val.data),
+            Err(e) => Err(anyhow!(e.to_string())),
+        }
+    }
+
+    fn store_resource_info(&self, resource: Vec<u8>) -> Result<String> {
+        let resource_id =  Uuid::new_v4().to_string();
+        let resourceInfo = ResourceInfo{
+            id: resource_id.clone(),
+            data: resource,
+            create_at:  Utc::now().timestamp(),
+        };
+
+        let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
+        diesel::insert_into(resource_infos_dsl::resource_infos).values(&resourceInfo).execute(lock.deref())?;
+        Ok(resource_id)
+    }
+}
+
 
 #[cfg(test)]
 mod tests{

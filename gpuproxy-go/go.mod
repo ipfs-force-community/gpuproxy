@@ -1,4 +1,4 @@
-module github.com/hunjixin/c2proxy/c2proxy-go
+module github.com/hunjixin/gpuproxy/gpuproxy-go
 
 go 1.16
 

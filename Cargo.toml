@@ -1,19 +1,19 @@
 [package]
-name = "c2proxy"
+name = "gpuproxy"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "c2proxy"
+name = "gpuproxy"
 path = "src/lib.rs"
 
 [[bin]]
-name = "c2proxy"
-path = "src/c2proxy/main.rs"
+name = "gpuproxy"
+path = "src/gpuproxy/main.rs"
 
 [[bin]]
-name = "c2proxy_worker"
-path = "src/c2proxy_worker/main.rs"
+name = "gpuproxy_worker"
+path = "src/gpuproxy_worker/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

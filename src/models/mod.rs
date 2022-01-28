@@ -4,6 +4,7 @@ pub mod migrations;
 use diesel::prelude::*;
 use schema::tasks;
 use schema::worker_infos;
+use schema::resource_infos;
 use serde::{Serialize, Deserialize};
 use serde::{Serializer, Deserializer};
 
@@ -12,9 +13,7 @@ use serde::{Serializer, Deserializer};
 pub struct Task {
     pub id: String,
     pub miner: String,
-    pub prove_id: String,
-    pub sector_id: i64,
-    pub phase1_output: String,
+    pub resource_id: String,
     pub proof: String,
     pub worker_id: String,
     pub task_type: i32,
@@ -30,16 +29,14 @@ pub struct Task {
 pub struct NewTask {
     pub id: String,
     pub miner: String,
-    pub prove_id: String,
-    pub sector_id: i64,
-    pub phase1_output: String,
+    pub resource_id: String,
     pub worker_id: String,
     pub task_type: i32,
     pub status: i32,
     pub create_at: i64,
 }
 
-#[derive(Debug, Serialize, Deserialize,Queryable)]
+#[derive(Debug, Serialize, Deserialize,Identifiable, Queryable)]
 pub struct WorkerInfo {
     pub id: String,
 }
@@ -49,6 +46,16 @@ pub struct WorkerInfo {
 pub struct NewWorkerInfo {
     pub id: String,
 }
+
+
+#[derive(Debug, Queryable, Identifiable, Insertable)]
+#[table_name = "resource_infos"]
+pub struct ResourceInfo {
+    pub id: String,
+    pub data: Vec<u8>,
+    pub create_at: i64,
+}
+
 
 pub fn establish_connection(conn_string: &str) -> SqliteConnection {
     SqliteConnection::establish(conn_string).unwrap_or_else(|_| panic!("Error connecting to {}", conn_string))

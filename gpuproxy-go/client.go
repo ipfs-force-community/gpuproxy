@@ -1,4 +1,4 @@
-package c2proxy_go
+package gpuproxy_go
 
 import (
 	"context"
