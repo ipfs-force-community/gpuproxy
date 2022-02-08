@@ -1147,7 +1147,6 @@ dependencies = [
  "diesel_migrations",
  "filecoin-proofs-api",
  "forest_address",
- "hex",
  "jsonrpc-core",
  "jsonrpc-core-client",
  "jsonrpc-derive",

@@ -3,6 +3,8 @@ use filecoin_proofs_api::{ProverId, SectorId};
 use crate::proof_rpc::task_pool::*;
 use crate::models::{Task, Bas64Byte};
 use crate::proof_rpc::resource;
+use crate::proof_rpc::utils::{*};
+
 use jsonrpc_core::{Result,Error, ErrorCode};
 use jsonrpc_derive::rpc;
 
@@ -10,6 +12,7 @@ use jsonrpc_http_server::jsonrpc_core::IoHandler;
 use jsonrpc_core_client::transports::http;
 use std::sync::Arc;
 use anyhow::anyhow;
+
 
 #[rpc(client, server)]
 pub trait ProofRpc {
@@ -39,6 +42,8 @@ pub trait ProofRpc {
     #[rpc(name = "Proof.RecordError")]
     fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String) -> Result<bool>;
 
+    #[rpc(name = "Proof.ListTask")]
+    fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<i32>>) -> Result<Vec<Task>>;
 }
 
 pub struct ProofImpl {
@@ -62,7 +67,7 @@ impl ProofRpc for ProofImpl {
         };
         let  resource_bytes = serde_json::to_vec(&c2_resurce).unwrap();
         let resource_id = self.resource.store_resource_info(resource_bytes).unwrap();
-        let tid = self.pool.addTask(addr, resource_id).unwrap();
+        let tid = self.pool.add_task(addr, resource_id).unwrap();
         Ok(tid)
     }
 
@@ -107,6 +112,10 @@ impl ProofRpc for ProofImpl {
             _ => Ok(true)
         }
     }
+
+    fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<i32>>) -> Result<Vec<Task>> {
+        Ok(self.pool.list_task(worker_id_arg, state).unwrap())
+    }
 }
 
 pub fn register(resource: Arc<dyn resource::Resource+ Send + Sync>, pool:  Arc<dyn Taskpool+ Send + Sync>) -> IoHandler {
@@ -137,10 +146,7 @@ impl WrapClient {
 
 impl resource::Resource for WrapClient {
     fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Vec<u8>> {
-        match jsonrpc_core::futures_executor::block_on(self.client.get_resource_info(resource_id_arg)) {
-            Ok(t)=>Ok(t),
-            Err(e)=>Err(anyhow!(e.to_string()))
-        }
+         jsonrpc_core::futures_executor::block_on(self.client.get_resource_info(resource_id_arg)).anyhow()
     }
 
     fn store_resource_info(&self, _: Vec<u8>) -> anyhow::Result<String> {
@@ -150,35 +156,76 @@ impl resource::Resource for WrapClient {
 
 impl WorkerFetch for WrapClient{
     fn fetch_one_todo(&self, worker_id: String) -> anyhow::Result<Task> {
-        match jsonrpc_core::futures_executor::block_on(self.client.fetch_todo(worker_id)) {
-            Ok(t)=>Ok(t),
-            Err(e)=>Err(anyhow!(e.to_string()))
-        }
+         jsonrpc_core::futures_executor::block_on(self.client.fetch_todo(worker_id)).anyhow()
     }
 
     fn fetch_uncomplte(&self, worker_id_arg: String) -> anyhow:: Result<Vec<Task>> {
-        match jsonrpc_core::futures_executor::block_on(self.client.fetch_uncomplte(worker_id_arg)) {
-            Ok(t)=>Ok(t),
-            Err(e)=>Err(anyhow!(e.to_string()))
-        }
+         jsonrpc_core::futures_executor::block_on(self.client.fetch_uncomplte(worker_id_arg)).anyhow()
     }
 
      fn record_error(&self, worker_id: String, tid: String, err_msg: String) -> Option<anyhow::Error> {
-         match jsonrpc_core::futures_executor::block_on(self.client.record_error(worker_id, tid, err_msg)) {
-             Ok(_)=> None,
-             Err(e)=>Some(anyhow!(e.to_string()))
-         }
+          jsonrpc_core::futures_executor::block_on(self.client.record_error(worker_id, tid, err_msg)).err().map(|e|anyhow!(e.to_string()))
     }
 
      fn record_proof(&self, worker_id: String, tid: String, proof: String) -> Option<anyhow::Error> {
-         match jsonrpc_core::futures_executor::block_on(self.client.record_proof(worker_id, tid, proof)) {
-             Ok(_)=> None,
-             Err(e)=>Some(anyhow!(e.to_string()))
-         }
+          jsonrpc_core::futures_executor::block_on(self.client.record_proof(worker_id, tid, proof)).err().map(|e|anyhow!(e.to_string()))
     }
 }
 
-pub enum ResourceOp {
-    File(resource::FileResource),
-    Db(TaskpoolImpl),
+
+pub trait GpuServiceRpcClient {
+    fn submit_task(&self,
+                   phase1_output: Bas64Byte,
+                   miner: String,
+                   prover_id: ProverId,
+                   sector_id: u64,
+    ) -> anyhow::Result<String>;
+
+    fn get_task(&self, id: String) -> anyhow::Result<Task>;
+
+    fn fetch_todo(&self, worker_id_arg: String) -> anyhow::Result<Task> ;
+
+    fn fetch_uncomplte(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>>;
+
+    fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Vec<u8>>;
+
+    fn record_proof(&self, worker_id_arg: String, tid: String, proof: String) -> anyhow::Result<bool>;
+
+    fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String) -> anyhow::Result<bool>;
+
+    fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<i32>>) -> anyhow::Result<Vec<Task>>;
+}
+
+impl GpuServiceRpcClient for WrapClient{
+    fn submit_task(&self, phase1_output: Bas64Byte, miner: String, prover_id: ProverId, sector_id: u64) -> anyhow::Result<String> {
+        jsonrpc_core::futures_executor::block_on(self.client.submit_task(phase1_output, miner, prover_id, sector_id)).anyhow()
+    }
+
+    fn get_task(&self, id: String) -> anyhow::Result<Task> {
+        jsonrpc_core::futures_executor::block_on(self.client.get_task(id)).anyhow()
+    }
+
+    fn fetch_todo(&self, worker_id_arg: String) -> anyhow::Result<Task> {
+        jsonrpc_core::futures_executor::block_on(self.client.fetch_todo(worker_id_arg)).anyhow()
+    }
+
+    fn fetch_uncomplte(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>> {
+        jsonrpc_core::futures_executor::block_on(self.client.fetch_uncomplte(worker_id_arg)).anyhow()
+    }
+
+    fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Vec<u8>> {
+        jsonrpc_core::futures_executor::block_on(self.client.get_resource_info(resource_id_arg)).anyhow()
+    }
+
+    fn record_proof(&self, worker_id_arg: String, tid: String, proof: String) -> anyhow::Result<bool> {
+        jsonrpc_core::futures_executor::block_on(self.client.record_proof(worker_id_arg, tid, proof)).anyhow()
+    }
+
+    fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String) -> anyhow::Result<bool> {
+        jsonrpc_core::futures_executor::block_on(self.client.record_error(worker_id_arg, tid, err_msg)).anyhow()
+    }
+
+    fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<i32>>) -> anyhow::Result<Vec<Task>> {
+        jsonrpc_core::futures_executor::block_on(self.client.list_task(worker_id_arg, state)).anyhow()
+    }
 }

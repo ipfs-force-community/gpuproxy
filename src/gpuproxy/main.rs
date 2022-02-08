@@ -1,3 +1,5 @@
+mod cli;
+
 use gpuproxy::config::*;
 use gpuproxy::proof_rpc::*;
 use gpuproxy::models::*;

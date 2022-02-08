@@ -1,5 +1,4 @@
-use filecoin_proofs_api::seal::{seal_commit_phase2, SealCommitPhase1Output};
-use filecoin_proofs_api::{ProverId, SectorId};
+use filecoin_proofs_api::seal::{seal_commit_phase2};
 use std::sync::Arc;
 use anyhow::Result;
 use std::time::Duration;
@@ -8,7 +7,6 @@ use crate::proof_rpc::task_pool::*;
 use crate::models::*;
 use crate::proof_rpc::resource::{*};
 use log::*;
-use hex::FromHex;
 use crossbeam_channel::tick;
 use std::thread as stdthread;
 

@@ -1,17 +1,13 @@
 use std::fs::File;
 use std::fs;
-use std::format;
 use std::path::Path;
 use std::io::Read;
 use anyhow::{anyhow, Result};
-use std::sync::Mutex;
-use diesel::SqliteConnection;
 use filecoin_proofs_api::ProverId;
 use filecoin_proofs_api::seal::SealCommitPhase1Output;
 use filecoin_proofs_api::SectorId;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
-use serde::{Serializer, Deserializer};
 
 pub trait Resource {
     fn get_resource_info(&self, resource_id: String) -> Result<Vec<u8>>;

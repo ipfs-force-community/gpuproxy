@@ -11,3 +11,5 @@ task
 task.db
 
 example
+.DS_Store
+*.db

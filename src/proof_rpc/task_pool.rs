@@ -8,7 +8,6 @@ use std::sync::{Mutex};
 use diesel::insert_into;
 use diesel::prelude::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use filecoin_proofs_api::seal::{SealCommitPhase1Output};
 
 use anyhow::{anyhow, Result};
 use chrono::Utc;
@@ -18,6 +17,16 @@ use uuid::Uuid;
 #[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(i32)]
 pub enum TaskStatus {
+    Undefined,
+    Init,
+    Running,
+    Error,
+    Completed,
+}
+
+#[derive(IntoPrimitive, TryFromPrimitive)]
+#[repr(i32)]
+pub enum TaskType {
     Undefined,
     Init,
     Running,
@@ -37,7 +46,7 @@ pub trait WorkerFetch {
 }
 
 pub trait Common {
-    fn addTask(&self, miner_arg: forest_address::Address, resource_id: String) -> Result<String>;
+    fn add_task(&self, miner_arg: forest_address::Address, resource_id: String) -> Result<String>;
     fn fetch(&self, tid: String) -> Result<Task>;
     fn fetch_undo(&self) -> Result<Vec<Task>>;
     fn get_status(&self, tid: String) -> Result<TaskStatus>;
@@ -158,7 +167,7 @@ impl WorkerFetch for TaskpoolImpl {
 }
 
 impl Common for TaskpoolImpl {
-    fn addTask(&self, miner_arg: forest_address::Address, resource_id: String) -> Result<String> {
+    fn add_task(&self, miner_arg: forest_address::Address, resource_id: String) -> Result<String> {
         let miner_noprefix = &miner_arg.to_string()[1..];
         let new_task_id =  Uuid::new_v4().to_string();
         let new_task = NewTask{
@@ -239,14 +248,14 @@ impl Resource for TaskpoolImpl {
 
     fn store_resource_info(&self, resource: Vec<u8>) -> Result<String> {
         let resource_id =  Uuid::new_v4().to_string();
-        let resourceInfo = ResourceInfo{
+        let resource_info = ResourceInfo{
             id: resource_id.clone(),
             data: resource,
             create_at:  Utc::now().timestamp(),
         };
 
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        diesel::insert_into(resource_infos_dsl::resource_infos).values(&resourceInfo).execute(lock.deref())?;
+        diesel::insert_into(resource_infos_dsl::resource_infos).values(&resource_info).execute(lock.deref())?;
         Ok(resource_id)
     }
 }

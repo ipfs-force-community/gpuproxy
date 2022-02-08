@@ -31,7 +31,6 @@ diesel_migrations = "1.4.0"
 forest_address = "0.3.2"
 num_enum = "0.5.6"
 anyhow = "1.0.52"
-hex = {version ="0.4.3"}
 crossbeam-channel = "0.5.2"
 serde_json = { version = "1.0" }
 serde = "1.0.133"
