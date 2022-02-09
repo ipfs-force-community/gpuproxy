@@ -53,7 +53,7 @@ fn main() {
             let task_pool = task_pool::TaskpoolImpl::new(Mutex::new(db_conn));
             let worker_id = task_pool.get_worker_id().unwrap();
             
-            let worker_api =  Arc::new(proof::get_worker_api(cfg.url).unwrap());
+            let worker_api =  Arc::new(proof::get_proxy_api(cfg.url).unwrap());
             let worker = worker::LocalWorker::new(cfg.max_c2, worker_id.to_string(), worker_api.clone(), worker_api);
             let join_handle = worker.process_tasks();
             info!("ready for local worker address worker_id {}", worker_id);

@@ -1,12 +1,94 @@
 pub mod schema;
 pub mod migrations;
-
-use diesel::prelude::*;
+use std::fmt::{Debug};
 use schema::tasks;
 use schema::worker_infos;
 use schema::resource_infos;
 use serde::{Serialize, Deserialize};
 use serde::{Serializer, Deserializer};
+use std::io::Write;
+use diesel::prelude::*;
+use serde_repr::*;
+use diesel::backend::Backend;
+use diesel::deserialize::{self, FromSql};
+use diesel::serialize::{self, Output, ToSql};
+use diesel::sql_types::*;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+
+#[derive(IntoPrimitive, TryFromPrimitive)]
+#[repr(i32)]
+#[derive(Serialize_repr, Deserialize_repr)]
+#[derive(Debug, Clone, Copy, PartialEq, AsExpression, FromSqlRow)]
+#[sql_type = "Integer"]
+pub enum TaskStatus {
+    Undefined = 0,
+    Init = 1,
+    Running = 2,
+    Error = 3,
+    Completed = 4,
+}
+
+impl<DB> ToSql<Integer, DB> for TaskStatus
+    where
+        DB: Backend,
+        i32: ToSql<Integer, DB>,
+{
+    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        (*self as i32).to_sql(out)
+    }
+}
+
+
+impl<DB> FromSql<Integer, DB> for TaskStatus
+    where
+        DB: Backend,
+        i32: FromSql<Integer, DB>,
+{
+    fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
+        match i32::from_sql(bytes)? {
+            0 => Ok(TaskStatus::Undefined),
+            1 => Ok(TaskStatus::Init),
+            2 => Ok(TaskStatus::Running),
+            3 => Ok(TaskStatus::Error),
+            4 => Ok(TaskStatus::Completed),
+            x => Err(format!("Unrecognized variant {}", x).into()),
+        }
+    }
+}
+
+#[derive(IntoPrimitive, TryFromPrimitive)]
+#[repr(i32)]
+#[derive(Serialize_repr, Deserialize_repr)]
+#[derive(Debug, Clone, Copy, PartialEq, AsExpression, FromSqlRow)]
+#[sql_type = "Integer"]
+pub enum TaskType {
+    C2 = 0,
+}
+
+
+impl<DB> ToSql<Integer, DB> for TaskType
+    where
+        DB: Backend,
+        i32: ToSql<Integer, DB>,
+{
+    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        (*self as i32).to_sql(out)
+    }
+}
+
+
+impl<DB> FromSql<Integer, DB> for TaskType
+    where
+        DB: Backend,
+        i32: FromSql<Integer, DB>,
+{
+    fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
+        match i32::from_sql(bytes)? {
+            0 => Ok(TaskType::C2),
+            x => Err(format!("Unrecognized variant {}", x).into()),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Identifiable,Queryable)]
 #[serde(rename_all = "camelCase")]
@@ -16,9 +98,9 @@ pub struct Task {
     pub resource_id: String,
     pub proof: String,
     pub worker_id: String,
-    pub task_type: i32,
+    pub task_type: TaskType,
     pub error_msg: String,
-    pub status: i32,
+    pub status: TaskStatus,
     pub create_at: i64,
     pub start_at: i64,
     pub complete_at: i64,
@@ -31,8 +113,8 @@ pub struct NewTask {
     pub miner: String,
     pub resource_id: String,
     pub worker_id: String,
-    pub task_type: i32,
-    pub status: i32,
+    pub task_type: TaskType,
+    pub status: TaskStatus,
     pub create_at: i64,
 }
 

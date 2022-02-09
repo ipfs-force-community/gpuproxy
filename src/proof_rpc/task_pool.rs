@@ -1,5 +1,5 @@
 use std::ops::Deref;
-use crate::models::{NewTask, Task, WorkerInfo, ResourceInfo,NewWorkerInfo};
+use crate::models::{NewTask, Task, WorkerInfo, ResourceInfo, NewWorkerInfo, TaskStatus, TaskType};
 use crate::models::schema::tasks::dsl as tasks_dsl;
 use crate::models::schema::worker_infos::dsl as worker_infos_dsl;
 use crate::models::schema::resource_infos::dsl as resource_infos_dsl;
@@ -7,32 +7,12 @@ use crate::proof_rpc::resource::{*};
 use std::sync::{Mutex};
 use diesel::insert_into;
 use diesel::prelude::*;
-use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use anyhow::{anyhow, Result};
 use chrono::Utc;
 use log::info;
 use uuid::Uuid;
-
-#[derive(IntoPrimitive, TryFromPrimitive)]
-#[repr(i32)]
-pub enum TaskStatus {
-    Undefined,
-    Init,
-    Running,
-    Error,
-    Completed,
-}
-
-#[derive(IntoPrimitive, TryFromPrimitive)]
-#[repr(i32)]
-pub enum TaskType {
-    Undefined,
-    Init,
-    Running,
-    Error,
-    Completed,
-}
+use crate::proof_rpc::utils::IntoAnyhow;
 
 pub trait WorkerApi {
     fn get_worker_id(&self) -> Result<uuid::Uuid>;
@@ -101,24 +81,17 @@ impl WorkerFetch for TaskpoolImpl {
             tasks_dsl:: start_at.eq(Utc::now().timestamp()),
         )).execute(lock.deref());
         info!("worker {} fetch {} to do", worker_id_arg, result.id);
-        match update_result {
-            Ok(_) => Ok(result),
-            Err(e) => Err(anyhow!(e.to_string())),
-        }
+        update_result.map(|_|result).anyhow()
     }
 
     fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>>{
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        let result = tasks_dsl::tasks.filter(
+        tasks_dsl::tasks.filter(
             tasks_dsl::worker_id.eq(worker_id_arg).and(
                 tasks_dsl::status.eq::<i32>(TaskStatus::Running.into())
             )
         )
-            .load(lock.deref());
-        match result {
-            Ok(val) => Ok(val),
-            Err(e) => Err(anyhow!(e.to_string())),
-        }
+            .load(lock.deref()).anyhow()
     }
 
     fn record_error(&self,  worker_id_arg: String, tid: String, err_msg_str: String) -> Option<anyhow::Error> {
@@ -137,10 +110,7 @@ impl WorkerFetch for TaskpoolImpl {
                    )
             ).execute(lock.deref());
         info!("worker {} mark task {} as error reason:{}", worker_id_arg, tid, err_msg_str);
-        match update_result {
-            Ok(_) => Option::None,
-            Err(e) => Some(anyhow!(e.to_string())),
-        }
+        update_result.err().map(|e|anyhow!(e.to_string()))
     }
 
     fn record_proof(&self,  worker_id_arg: String, tid: String, proof_str: String) -> Option<anyhow::Error> {
@@ -156,13 +126,11 @@ impl WorkerFetch for TaskpoolImpl {
             (tasks_dsl::status.eq::<i32>(TaskStatus::Completed.into()),
              tasks_dsl::worker_id.eq(worker_id_arg.clone()),
              tasks_dsl::proof.eq(proof_str),
+                tasks_dsl::create_at.eq(Utc::now().timestamp())
                     )
         ).execute(lock.deref());
         info!("worker {} complete task {} successfully", worker_id_arg, tid);
-        match update_result {
-            Ok(_) => Option::None,
-            Err(e) => Some(anyhow!(e.to_string())),
-        }
+        update_result.err().map(|e|anyhow!(e.to_string()))
     }
 }
 
@@ -175,47 +143,40 @@ impl Common for TaskpoolImpl {
             miner: miner_noprefix.to_string(),
             resource_id: resource_id.clone(),
             worker_id: "".to_string(),
-            task_type:0,
+            task_type: TaskType::C2,
             status:TaskStatus::Init.into(),
             create_at: Utc::now().timestamp(),
         };
 
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        let result = insert_into(tasks_dsl::tasks).values(&new_task).execute(lock.deref());
-        match result {
-            Ok(_) => {
-                Ok(new_task_id)
-            },
-            Err(e) => Err(anyhow!(e.to_string())),
-        }
+        insert_into(tasks_dsl::tasks).values(&new_task)
+            .execute(lock.deref())
+            .anyhow()
+            .and(Ok(new_task_id))
     }
 
     fn fetch(&self, tid: String) -> Result<Task> {
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        let result = tasks_dsl::tasks.find(tid).first(lock.deref());
-        match result {
-            Ok(val) => Ok(val),
-            Err(e) => Err(anyhow!(e.to_string())),
-        }
+        tasks_dsl::tasks.find(tid).first(lock.deref()).anyhow()
     }
 
     fn fetch_undo(&self) -> Result<Vec<Task>> {
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        let result = tasks_dsl::tasks.filter(tasks_dsl::status.eq::<i32>(TaskStatus::Init.into()))
-            .load(lock.deref());
-        match result {
-            Ok(val) => Ok(val),
-            Err(e) => Err(anyhow!(e.to_string())),
-        }
+         tasks_dsl::tasks.filter(tasks_dsl::status.eq::<i32>(TaskStatus::Init.into()))
+            .load(lock.deref())
+             .anyhow()
     }
 
     fn get_status(&self, tid: String) -> Result<TaskStatus> {
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        let result: QueryResult::<i32> = tasks_dsl::tasks.select(tasks_dsl::status).filter(tasks_dsl::id.eq(tid)).get_result(lock.deref());
-        match result {
-            Ok(val) => Ok(TaskStatus::try_from(val)?),
-            Err(e) => Err(anyhow!(e.to_string())),
-        }
+       tasks_dsl::tasks.select(tasks_dsl::status)
+            .filter(tasks_dsl::id.eq(tid))
+            .get_result(lock.deref())
+          //.map(|val: i32|TaskStatus::try_from(val)?) cannot compile ?
+            .map_err(|e|anyhow!(e.to_string()))
+            .map(|val: i32|TaskStatus::try_from(val).map_err(|e|anyhow!(e.to_string()))) //todo change unwrap to ?
+            .flatten()
+            .anyhow()
     }
     fn list_task(&self, worker_id_opt: Option<String>, state_cod: Option<Vec<i32>>) -> Result<Vec<Task>> {
         let mut query =  tasks_dsl::tasks.into_boxed();
@@ -228,22 +189,17 @@ impl Common for TaskpoolImpl {
         }
 
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        let result = query.load(lock.deref());
-        match result {
-            Ok(val) => Ok(val),
-            Err(e) => Err(anyhow!(e.to_string())),
-        }
+        query.load(lock.deref()).anyhow()
     }
 }
 
 impl Resource for TaskpoolImpl {
     fn get_resource_info(&self, resource_id: String) -> Result<Vec<u8>> {
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
-        let result = resource_infos_dsl::resource_infos.filter(resource_infos_dsl::id.eq(resource_id)).first(lock.deref());
-        match result {
-            Ok::<ResourceInfo,_>(val) => Ok(val.data),
-            Err(e) => Err(anyhow!(e.to_string())),
-        }
+        resource_infos_dsl::resource_infos.filter(resource_infos_dsl::id.eq(resource_id))
+            .first(lock.deref())
+            .map(|val: ResourceInfo|val.data)
+            .anyhow()
     }
 
     fn store_resource_info(&self, resource: Vec<u8>) -> Result<String> {

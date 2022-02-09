@@ -1,3 +1,5 @@
+#![feature(result_flattening)]
+
 #[macro_use]
 extern crate diesel;
 

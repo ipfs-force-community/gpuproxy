@@ -20,6 +20,7 @@ use std::env;
 fn main() {
     TermLogger::init(LevelFilter::Trace, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
 
+    let list_task_cmds  = cli::list_task_cmds();
     let app_m = App::new("gpuproxy")
         .version("0.0.1")
         .setting(AppSettings::ArgRequiredElseHelp)
@@ -53,6 +54,7 @@ fn main() {
                         .help("disable worker on gpuproxy manager"),
                 ]),
         )
+        .subcommand(list_task_cmds)
         .get_matches();
 
     match app_m.subcommand() {
@@ -64,6 +66,9 @@ fn main() {
             let disable_worker: bool = sub_m.value_of_t("disable-worker").unwrap_or_else(|e| e.exit());
             let cfg = ServiceConfig::new(url, db_dsn, max_c2, disable_worker, "db".to_string(), "".to_string());
             run_cfg(cfg).unwrap().wait();
+        } // run was used
+        Some(("tasks", ref sub_m)) => {
+            cli::sub_command(sub_m)
         } // run was used
         _ => {} // Either no subcommand or one not tested for...
     }

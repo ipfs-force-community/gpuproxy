@@ -26,13 +26,14 @@ jsonrpc-http-server = "18.0.0"
 jsonrpc-core-client = {version="18.0.0", features = ["http"]}
 log = { version = "0.4", features = ["std"] }
 simplelog = "*"
-diesel = { version = "1.4.4", features = ["sqlite", "numeric"] }
+diesel = { version = "1.4.4", default-features = false, features = ["sqlite", "numeric"] }
 diesel_migrations = "1.4.0"
 forest_address = "0.3.2"
 num_enum = "0.5.6"
 anyhow = "1.0.52"
 crossbeam-channel = "0.5.2"
 serde_json = { version = "1.0" }
+serde_repr = "0.1"
 serde = "1.0.133"
 chrono = "0.4.19"
 crossbeam = "0.8.1"
@@ -41,3 +42,7 @@ base64 = "0.13.0"
 uuid = { version = "0.8", features = ["v4"] }
 defer = "0.1.0"
 scopeguard = "1.1.0"
+tokio = "1.16.1"
+
+[features]
+sqlite = ["diesel/sqlite"]
