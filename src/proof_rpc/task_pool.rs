@@ -98,7 +98,7 @@ impl WorkerFetch for TaskpoolImpl {
         let lock_result = self.conn.lock();
         if let Some(e) = lock_result.as_ref().err() {return Some(anyhow!(e.to_string()));}
         let lock = lock_result.unwrap();
-        let update_result = diesel::update(
+        diesel::update(
             tasks_dsl::tasks.filter(
                 tasks_dsl::id.eq(tid.clone())
             )
@@ -108,9 +108,10 @@ impl WorkerFetch for TaskpoolImpl {
                 tasks_dsl::worker_id.eq(worker_id_arg.clone()),
                 tasks_dsl::error_msg.eq(err_msg_str.clone()),
                    )
-            ).execute(lock.deref());
-        info!("worker {} mark task {} as error reason:{}", worker_id_arg, tid, err_msg_str);
-        update_result.err().map(|e|anyhow!(e.to_string()))
+            ).execute(lock.deref()).map(|e|{
+            info!("worker {} mark task {} as error reason:{}", worker_id_arg, tid, err_msg_str);
+            e
+        }).err().map(|e|anyhow!(e.to_string()))
     }
 
     fn record_proof(&self,  worker_id_arg: String, tid: String, proof_str: String) -> Option<anyhow::Error> {
@@ -118,7 +119,7 @@ impl WorkerFetch for TaskpoolImpl {
         if let Some(e) = lock_result.as_ref().err() {return Some(anyhow!(e.to_string()));}
         let lock = lock_result.unwrap();
 
-        let update_result = diesel::update(
+        diesel::update(
             tasks_dsl::tasks.filter(
                 tasks_dsl::id.eq(tid.clone())
                     )
@@ -128,9 +129,11 @@ impl WorkerFetch for TaskpoolImpl {
              tasks_dsl::proof.eq(proof_str),
                 tasks_dsl::create_at.eq(Utc::now().timestamp())
                     )
-        ).execute(lock.deref());
-        info!("worker {} complete task {} successfully", worker_id_arg, tid);
-        update_result.err().map(|e|anyhow!(e.to_string()))
+        ).execute(lock.deref())
+            .map(|e|{
+                info!("worker {} complete task {} successfully", worker_id_arg, tid);
+                e
+            }).err().map(|e|anyhow!(e.to_string()))
     }
 }
 
