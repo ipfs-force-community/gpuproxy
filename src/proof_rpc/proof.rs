@@ -12,11 +12,12 @@ use jsonrpc_http_server::jsonrpc_core::IoHandler;
 use jsonrpc_core_client::transports::http;
 use std::sync::Arc;
 use anyhow::anyhow;
+use jsonrpc_core::ErrorCode::{InternalError, InvalidParams};
 
 #[rpc(client, server)]
 pub trait ProofRpc {
-    #[rpc(name = "Proof.SubmitTask")]
-    fn submit_task(&self,
+    #[rpc(name = "Proof.SubmitC2Task")]
+    fn submit_c2_task(&self,
                   phase1_output: Bas64Byte,
                   miner: String,
                   prover_id: ProverId,
@@ -33,7 +34,7 @@ pub trait ProofRpc {
     fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>>;
 
     #[rpc(name = "Proof.GetResourceInfo")]
-    fn get_resource_info(&self, resource_id_arg: String) -> Result<Vec<u8>>;
+    fn get_resource_info(&self, resource_id_arg: String) -> Result<Bas64Byte>;
 
     #[rpc(name = "Proof.RecordProof")]
     fn record_proof(&self, worker_id_arg: String, tid: String, proof: String) -> Result<bool>;
@@ -51,39 +52,38 @@ pub struct ProofImpl {
 }
 
 impl ProofRpc for ProofImpl {
-    fn submit_task(&self,
+    fn submit_c2_task(&self,
           phase1_output: Bas64Byte,
           miner: String,
           prover_id: ProverId,
           sector_id: u64,
     ) -> Result<String> {
-        let scp1o = serde_json::from_slice(Into::<Vec<u8>>::into(phase1_output).as_slice()).unwrap();
-        let addr = forest_address::Address::from_str(miner.as_str()).unwrap();
+        let scp1o = serde_json::from_slice(Into::<Vec<u8>>::into(phase1_output).as_slice()).to_jsonrpc_result(InvalidParams)?;
+        let addr = forest_address::Address::from_str(miner.as_str()).to_jsonrpc_result(InvalidParams)?;
         let c2_resurce = resource::C2{
             prove_id: prover_id,
             sector_id: SectorId::from(sector_id),
             phase1_output: scp1o,
         };
-        let  resource_bytes = serde_json::to_vec(&c2_resurce).unwrap();
-        let resource_id = self.resource.store_resource_info(resource_bytes).unwrap();
-        let tid = self.pool.add_task(addr, resource_id).unwrap();
-        Ok(tid)
+        let  resource_bytes = serde_json::to_vec(&c2_resurce).to_jsonrpc_result(InternalError)?;
+        let resource_id = self.resource.store_resource_info(resource_bytes).to_jsonrpc_result(InternalError)?;
+        self.pool.add_task(addr, resource_id).to_jsonrpc_result(InternalError)
     }
 
     fn get_task(&self, id: String) -> Result<Task> {
-        Ok(self.pool.fetch(id).unwrap())
+        self.pool.fetch(id).to_jsonrpc_result(InternalError)
     }
 
     fn fetch_todo(&self, worker_id_arg: String) -> Result<Task> {
-        Ok(self.pool.fetch_one_todo(worker_id_arg).unwrap())
+        self.pool.fetch_one_todo(worker_id_arg).to_jsonrpc_result(InternalError)
     }
 
     fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>>{
-        Ok(self.pool.fetch_uncomplte(worker_id_arg).unwrap())
+        self.pool.fetch_uncomplte(worker_id_arg).to_jsonrpc_result(InternalError)
     }
 
-    fn get_resource_info(&self, resource_id_arg: String) -> Result<Vec<u8>>{
-        Ok(self.resource.get_resource_info(resource_id_arg).unwrap())
+    fn get_resource_info(&self, resource_id_arg: String) -> Result<Bas64Byte>{
+        self.resource.get_resource_info(resource_id_arg).to_jsonrpc_result(InternalError)
     }
 
     fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String) -> Result<bool> {
@@ -95,7 +95,7 @@ impl ProofRpc for ProofImpl {
     }
 
     fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<i32>>) -> Result<Vec<Task>> {
-        Ok(self.pool.list_task(worker_id_arg, state).unwrap())
+        self.pool.list_task(worker_id_arg, state).to_jsonrpc_result(InternalError)
     }
 }
 
@@ -121,7 +121,7 @@ pub struct WrapClient{
 }
 
 impl resource::Resource for WrapClient {
-    fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Vec<u8>> {
+    fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Bas64Byte> {
           self.rt.block_on(self.client.get_resource_info(resource_id_arg)).anyhow()
     }
 
@@ -150,7 +150,7 @@ impl WorkerFetch for WrapClient{
 
 
 pub trait GpuServiceRpcClient {
-    fn submit_task(&self,
+    fn submit_c2_task(&self,
                    phase1_output: Bas64Byte,
                    miner: String,
                    prover_id: ProverId,
@@ -163,7 +163,7 @@ pub trait GpuServiceRpcClient {
 
     fn fetch_uncomplte(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>>;
 
-    fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Vec<u8>>;
+    fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Bas64Byte>;
 
     fn record_proof(&self, worker_id_arg: String, tid: String, proof: String) -> anyhow::Result<bool>;
 
@@ -173,8 +173,8 @@ pub trait GpuServiceRpcClient {
 }
 
 impl GpuServiceRpcClient for WrapClient{
-    fn submit_task(&self, phase1_output: Bas64Byte, miner: String, prover_id: ProverId, sector_id: u64) -> anyhow::Result<String> {
-         self.rt.block_on(self.client.submit_task(phase1_output, miner, prover_id, sector_id)).anyhow()
+    fn submit_c2_task(&self, phase1_output: Bas64Byte, miner: String, prover_id: ProverId, sector_id: u64) -> anyhow::Result<String> {
+         self.rt.block_on(self.client.submit_c2_task(phase1_output, miner, prover_id, sector_id)).anyhow()
     }
 
     fn get_task(&self, id: String) -> anyhow::Result<Task> {
@@ -189,7 +189,7 @@ impl GpuServiceRpcClient for WrapClient{
          self.rt.block_on(self.client.fetch_uncomplte(worker_id_arg)).anyhow()
     }
 
-    fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Vec<u8>> {
+    fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Bas64Byte> {
          self.rt.block_on(self.client.get_resource_info(resource_id_arg)).anyhow()
     }
 

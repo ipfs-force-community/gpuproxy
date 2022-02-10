@@ -10,9 +10,11 @@ use diesel::prelude::*;
 
 use anyhow::{anyhow, Result};
 use chrono::Utc;
+use forest_address::Error::Base32Decoding;
 use log::info;
 use uuid::Uuid;
 use crate::proof_rpc::utils::IntoAnyhow;
+use crate::models::Bas64Byte;
 
 pub trait WorkerApi {
     fn get_worker_id(&self) -> Result<uuid::Uuid>;
@@ -75,13 +77,13 @@ impl WorkerFetch for TaskpoolImpl {
 
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
         let result: Task = tasks_dsl::tasks.filter(tasks_dsl::status.eq::<i32>(TaskStatus::Init.into())).first(lock.deref())?;
-        let update_result = diesel::update(tasks_dsl::tasks.filter(tasks_dsl::id.eq(result.id.clone()))).set((
+        diesel::update(tasks_dsl::tasks.filter(tasks_dsl::id.eq(result.id.clone()))).set((
             tasks_dsl::status.eq::<i32>(TaskStatus::Running.into()),
             tasks_dsl::worker_id.eq(worker_id_arg.clone()),
             tasks_dsl:: start_at.eq(Utc::now().timestamp()),
-        )).execute(lock.deref());
-        info!("worker {} fetch {} to do", worker_id_arg, result.id);
-        update_result.map(|_|result).anyhow()
+        )).execute(lock.deref()).map(|_|{
+            info!("worker {} fetch {} to do", worker_id_arg, result.id);
+            result}).anyhow()
     }
 
     fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>>{
@@ -197,11 +199,11 @@ impl Common for TaskpoolImpl {
 }
 
 impl Resource for TaskpoolImpl {
-    fn get_resource_info(&self, resource_id: String) -> Result<Vec<u8>> {
+    fn get_resource_info(&self, resource_id: String) -> Result<Bas64Byte> {
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
         resource_infos_dsl::resource_infos.filter(resource_infos_dsl::id.eq(resource_id))
             .first(lock.deref())
-            .map(|val: ResourceInfo|val.data)
+            .map(|val: ResourceInfo|Bas64Byte::new(val.data))
             .anyhow()
     }
 

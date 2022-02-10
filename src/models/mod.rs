@@ -146,6 +146,12 @@ pub fn establish_connection(conn_string: &str) -> SqliteConnection {
 #[derive(Debug)]
 pub struct Bas64Byte(Vec<u8>);
 
+impl  Bas64Byte {
+    pub fn new(data: Vec<u8>) -> Self {
+        Bas64Byte(data)
+    }
+}
+
 impl Into<Vec<u8>> for Bas64Byte {
     fn into(self) -> Vec<u8> {
        self.0

@@ -37,3 +37,21 @@ impl<E> ReveseOption for Option<E>
         }
     }
 }
+
+pub trait IntoJsonRpcResult<T> {
+    fn to_jsonrpc_result(self, code: jsonrpc_core::ErrorCode) -> jsonrpc_core::Result<T>;
+}
+
+impl<T, E> IntoJsonRpcResult<T> for Result<T, E>
+    where
+        E: Display
+{
+    fn to_jsonrpc_result(self, code: jsonrpc_core::ErrorCode) -> jsonrpc_core::Result<T> {
+        self.map_err(|e|jsonrpc_core::Error{
+            code: code,
+            message: e.to_string(),
+            data:None,
+        })
+    }
+}
+

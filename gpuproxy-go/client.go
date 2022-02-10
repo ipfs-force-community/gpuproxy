@@ -39,7 +39,7 @@ type C2ProxyWorker interface {
 }
 
 type C2ProxyClient interface {
-	SubmitTask(phase1_output []byte, miner string, prover_id [32]byte, sector_id int64) (string, error)
+	SubmitC2Task(phase1_output []byte, miner string, prover_id [32]byte, sector_id int64) (string, error)
 	GetTask(id string) (Task, error)
 }
 

@@ -66,7 +66,7 @@ impl Worker for LocalWorker {
                                 error!("unable to get resource of {}, reason:{}", undo_task.resource_id, e.to_string());
                                 continue
                             }
-                            let resource =  resource_result.unwrap();
+                            let resource: Vec<u8> =  resource_result.unwrap().into();
                             stdthread::spawn(move|| {
                                 defer! {
                                     count_clone.fetch_sub(1, Ordering::SeqCst);

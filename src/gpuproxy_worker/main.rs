@@ -20,12 +20,12 @@ fn main() {
         .subcommand(
             App::new("run")
                 .setting(AppSettings::ArgRequiredElseHelp)
-                .about("gpuproxy worker for execte compute task")
+                .about("worker for execute task")
                 .args(&[
                     Arg::new("gpuproxy-url")
                         .long("gpuproxy-url")
                         .env("C2PROXY_LISTEN_URL")
-                        .default_value("127.0.0.1:8888")
+                        .default_value("http://127.0.0.1:8888")
                         .help("specify url for connect gpuproxy for get task to excute"),
                     Arg::new("db-dsn")
                         .long("db-dsn")
