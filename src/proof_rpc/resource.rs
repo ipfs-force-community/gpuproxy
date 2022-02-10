@@ -27,6 +27,7 @@ impl FileResource {
         }
     }
 }
+
 unsafe impl Send for FileResource {}
 unsafe impl Sync for FileResource {}
 
