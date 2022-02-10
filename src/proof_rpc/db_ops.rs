@@ -10,11 +10,10 @@ use diesel::prelude::*;
 
 use anyhow::{anyhow, Result};
 use chrono::Utc;
-use forest_address::Error::Base32Decoding;
 use log::info;
 use uuid::Uuid;
 use crate::proof_rpc::utils::IntoAnyhow;
-use crate::models::Bas64Byte;
+use crate::models::Base64Byte;
 
 pub trait WorkerApi {
     fn get_worker_id(&self) -> Result<uuid::Uuid>;
@@ -199,11 +198,11 @@ impl Common for TaskpoolImpl {
 }
 
 impl Resource for TaskpoolImpl {
-    fn get_resource_info(&self, resource_id: String) -> Result<Bas64Byte> {
+    fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
         let lock = self.conn.lock().map_err(|e|anyhow!(e.to_string()))?;
         resource_infos_dsl::resource_infos.filter(resource_infos_dsl::id.eq(resource_id))
             .first(lock.deref())
-            .map(|val: ResourceInfo|Bas64Byte::new(val.data))
+            .map(|val: ResourceInfo| Base64Byte::new(val.data))
             .anyhow()
     }
 

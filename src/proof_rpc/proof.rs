@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use filecoin_proofs_api::{ProverId, SectorId};
-use crate::proof_rpc::task_pool::*;
-use crate::models::{Task, Bas64Byte};
+use crate::proof_rpc::db_ops::*;
+use crate::models::{Task, Base64Byte};
 use crate::proof_rpc::resource;
 use crate::proof_rpc::utils::{*};
 
@@ -18,10 +18,10 @@ use jsonrpc_core::ErrorCode::{InternalError, InvalidParams};
 pub trait ProofRpc {
     #[rpc(name = "Proof.SubmitC2Task")]
     fn submit_c2_task(&self,
-                  phase1_output: Bas64Byte,
-                  miner: String,
-                  prover_id: ProverId,
-                  sector_id: u64,
+                      phase1_output: Base64Byte,
+                      miner: String,
+                      prover_id: ProverId,
+                      sector_id: u64,
     ) -> Result<String>;
 
     #[rpc(name = "Proof.GetTask")]
@@ -34,7 +34,7 @@ pub trait ProofRpc {
     fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>>;
 
     #[rpc(name = "Proof.GetResourceInfo")]
-    fn get_resource_info(&self, resource_id_arg: String) -> Result<Bas64Byte>;
+    fn get_resource_info(&self, resource_id_arg: String) -> Result<Base64Byte>;
 
     #[rpc(name = "Proof.RecordProof")]
     fn record_proof(&self, worker_id_arg: String, tid: String, proof: String) -> Result<bool>;
@@ -53,10 +53,10 @@ pub struct ProofImpl {
 
 impl ProofRpc for ProofImpl {
     fn submit_c2_task(&self,
-          phase1_output: Bas64Byte,
-          miner: String,
-          prover_id: ProverId,
-          sector_id: u64,
+                      phase1_output: Base64Byte,
+                      miner: String,
+                      prover_id: ProverId,
+                      sector_id: u64,
     ) -> Result<String> {
         let scp1o = serde_json::from_slice(Into::<Vec<u8>>::into(phase1_output).as_slice()).to_jsonrpc_result(InvalidParams)?;
         let addr = forest_address::Address::from_str(miner.as_str()).to_jsonrpc_result(InvalidParams)?;
@@ -82,7 +82,7 @@ impl ProofRpc for ProofImpl {
         self.pool.fetch_uncomplte(worker_id_arg).to_jsonrpc_result(InternalError)
     }
 
-    fn get_resource_info(&self, resource_id_arg: String) -> Result<Bas64Byte>{
+    fn get_resource_info(&self, resource_id_arg: String) -> Result<Base64Byte>{
         self.resource.get_resource_info(resource_id_arg).to_jsonrpc_result(InternalError)
     }
 
@@ -121,7 +121,7 @@ pub struct WrapClient{
 }
 
 impl resource::Resource for WrapClient {
-    fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Bas64Byte> {
+    fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Base64Byte> {
           self.rt.block_on(self.client.get_resource_info(resource_id_arg)).anyhow()
     }
 
@@ -151,10 +151,10 @@ impl WorkerFetch for WrapClient{
 
 pub trait GpuServiceRpcClient {
     fn submit_c2_task(&self,
-                   phase1_output: Bas64Byte,
-                   miner: String,
-                   prover_id: ProverId,
-                   sector_id: u64,
+                      phase1_output: Base64Byte,
+                      miner: String,
+                      prover_id: ProverId,
+                      sector_id: u64,
     ) -> anyhow::Result<String>;
 
     fn get_task(&self, id: String) -> anyhow::Result<Task>;
@@ -163,7 +163,7 @@ pub trait GpuServiceRpcClient {
 
     fn fetch_uncomplte(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>>;
 
-    fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Bas64Byte>;
+    fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Base64Byte>;
 
     fn record_proof(&self, worker_id_arg: String, tid: String, proof: String) -> anyhow::Result<bool>;
 
@@ -173,7 +173,7 @@ pub trait GpuServiceRpcClient {
 }
 
 impl GpuServiceRpcClient for WrapClient{
-    fn submit_c2_task(&self, phase1_output: Bas64Byte, miner: String, prover_id: ProverId, sector_id: u64) -> anyhow::Result<String> {
+    fn submit_c2_task(&self, phase1_output: Base64Byte, miner: String, prover_id: ProverId, sector_id: u64) -> anyhow::Result<String> {
          self.rt.block_on(self.client.submit_c2_task(phase1_output, miner, prover_id, sector_id)).anyhow()
     }
 
@@ -189,7 +189,7 @@ impl GpuServiceRpcClient for WrapClient{
          self.rt.block_on(self.client.fetch_uncomplte(worker_id_arg)).anyhow()
     }
 
-    fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Bas64Byte> {
+    fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Base64Byte> {
          self.rt.block_on(self.client.get_resource_info(resource_id_arg)).anyhow()
     }
 

@@ -144,21 +144,21 @@ pub fn establish_connection(conn_string: &str) -> SqliteConnection {
 }
 
 #[derive(Debug)]
-pub struct Bas64Byte(Vec<u8>);
+pub struct Base64Byte(Vec<u8>);
 
-impl  Bas64Byte {
+impl Base64Byte {
     pub fn new(data: Vec<u8>) -> Self {
-        Bas64Byte(data)
+        Base64Byte(data)
     }
 }
 
-impl Into<Vec<u8>> for Bas64Byte {
+impl Into<Vec<u8>> for Base64Byte {
     fn into(self) -> Vec<u8> {
        self.0
     }
 }
 
-impl Serialize for Bas64Byte {
+impl Serialize for Base64Byte {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
@@ -168,12 +168,12 @@ impl Serialize for Bas64Byte {
     }
 }
 
-impl<'de> Deserialize<'de> for Bas64Byte {
-    fn deserialize<D>(deserializer: D) -> Result<Bas64Byte, D::Error>
+impl<'de> Deserialize<'de> for Base64Byte {
+    fn deserialize<D>(deserializer: D) -> Result<Base64Byte, D::Error>
         where
             D: Deserializer<'de>,
     {
         let bytes_str = <String>::deserialize(deserializer)?;
-        Ok(Bas64Byte(base64::decode(bytes_str).unwrap()))
+        Ok(Base64Byte(base64::decode(bytes_str).unwrap()))
     }
 }

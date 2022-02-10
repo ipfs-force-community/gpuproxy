@@ -1,5 +1,5 @@
 pub mod proof;
-pub mod task_pool;
+pub mod db_ops;
 pub mod worker;
 pub mod resource;
 mod utils;

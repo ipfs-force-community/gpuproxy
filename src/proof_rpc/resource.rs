@@ -7,11 +7,11 @@ use filecoin_proofs_api::ProverId;
 use filecoin_proofs_api::seal::SealCommitPhase1Output;
 use filecoin_proofs_api::SectorId;
 use uuid::Uuid;
-use crate::models::Bas64Byte;
+use crate::models::Base64Byte;
 use serde::{Serialize, Deserialize};
 
 pub trait Resource {
-    fn get_resource_info(&self, resource_id: String) -> Result<Bas64Byte>;
+    fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte>;
     fn store_resource_info(&self, resource: Vec<u8>) -> Result<String>;
 }
 
@@ -31,14 +31,14 @@ unsafe impl Send for FileResource {}
 unsafe impl Sync for FileResource {}
 
 impl Resource for FileResource {
-    fn get_resource_info(&self, resource_id: String) -> Result<Bas64Byte> {
+    fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
         let new_path = Path::new(self.root.as_str()).join(resource_id.clone());
         let filename = new_path.to_str().ok_or(anyhow!("unable to find file for resource {} in directory {}", resource_id.clone(), self.root.clone()))?;
         let mut f = File::open(filename)?;
         let metadata = fs::metadata(filename)?;
         let mut buffer = vec![0; metadata.len() as usize];
         f.read(&mut buffer)?;
-        Ok(Bas64Byte::new(buffer))
+        Ok(Base64Byte::new(buffer))
     }
 
     fn store_resource_info(&self, resource: Vec<u8>) -> Result<String> {

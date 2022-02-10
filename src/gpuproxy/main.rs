@@ -12,7 +12,7 @@ use std::sync::Arc;
 use jsonrpc_http_server::ServerBuilder;
 use jsonrpc_http_server::Server;
 use crate::worker::Worker;
-use crate::task_pool::*;
+use crate::db_ops::*;
 use anyhow::{Result};
 use std::sync::{Mutex};
 use std::env;
@@ -77,7 +77,7 @@ fn main() {
 fn run_cfg(cfg: ServiceConfig) -> Result<Server> {
     let db_conn = establish_connection(cfg.db_dsn.as_str());
     run_db_migrations(&db_conn).expect("migrations error");
-    let task_pool = task_pool::TaskpoolImpl::new(Mutex::new(db_conn));
+    let task_pool = db_ops::TaskpoolImpl::new(Mutex::new(db_conn));
     let worker_id = task_pool.get_worker_id()?;
     let arc_pool = Arc::new(task_pool);
 

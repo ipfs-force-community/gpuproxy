@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use std::time::Duration;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use crate::proof_rpc::task_pool::*;
+use crate::proof_rpc::db_ops::*;
 use crate::models::*;
 use crate::proof_rpc::resource::{*};
 use log::*;
