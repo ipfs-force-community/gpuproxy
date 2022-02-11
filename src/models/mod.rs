@@ -163,7 +163,6 @@ impl Serialize for Base64Byte {
         where
             S: Serializer,
     {
-        println!("asdsadsad");
         serializer.serialize_str( base64::encode(&self.0).as_str())
     }
 }

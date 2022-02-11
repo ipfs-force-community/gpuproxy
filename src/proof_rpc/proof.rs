@@ -48,7 +48,7 @@ pub trait ProofRpc {
 
 pub struct ProofImpl {
     resource: Arc<dyn resource::Resource+ Send + Sync>,
-    pool: Arc<dyn Taskpool+ Send + Sync>,
+    pool: Arc<dyn DbOp + Send + Sync>,
 }
 
 impl ProofRpc for ProofImpl {
@@ -99,7 +99,7 @@ impl ProofRpc for ProofImpl {
     }
 }
 
-pub fn register(resource: Arc<dyn resource::Resource+ Send + Sync>, pool:  Arc<dyn Taskpool+ Send + Sync>) -> IoHandler {
+pub fn register(resource: Arc<dyn resource::Resource+ Send + Sync>, pool:  Arc<dyn DbOp + Send + Sync>) -> IoHandler {
     let mut io = IoHandler::default();
     let proof_impl = ProofImpl {resource, pool};
     io.extend_with(proof_impl.to_delegate());

@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use gpuproxy::config::*;
 use gpuproxy::proof_rpc::*;
 use gpuproxy::models::*;
@@ -11,8 +12,6 @@ use std::sync::Arc;
 use std::sync::{Mutex};
 
 fn main() {
-    TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
-
     let app_m = App::new("gpuproxy-worker")
         .version("0.0.1")
         .setting(AppSettings::ArgRequiredElseHelp)
@@ -37,6 +36,11 @@ fn main() {
                         .env("C2PROXY_MAX_C2")
                         .default_value("1")
                         .help("number of c2 task to run parallelly"),
+                    Arg::new("log-level")
+                        .long("log-level")
+                        .env("C2PROXY_LOG_LEVEL")
+                        .default_value("info")
+                        .help("set log level for application"),
                 ]),
         )
         .get_matches();
@@ -46,7 +50,11 @@ fn main() {
             let url: String = sub_m.value_of_t("gpuproxy-url").unwrap_or_else(|e| e.exit());
             let max_c2: usize = sub_m.value_of_t("max-c2").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
-            let cfg = ClientConfig::new(url, db_dsn, max_c2,"db".to_string(),"".to_string());
+            let log_level: String = sub_m.value_of_t("log-level").unwrap_or_else(|e| e.exit());
+            let cfg = ClientConfig::new(url, db_dsn, max_c2,"db".to_string(),"".to_string(), log_level);
+
+            let lv = LevelFilter::from_str(cfg.log_level.as_str()).unwrap();
+            TermLogger::init(lv, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
 
             let db_conn = establish_connection(cfg.db_dsn.as_str());
             run_db_migrations(&db_conn).expect("migrations error");

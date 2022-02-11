@@ -34,8 +34,8 @@ pub trait Common {
     fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<i32>>) -> Result<Vec<Task>>;
 }
 
-pub trait Taskpool:WorkerApi+WorkerFetch+Common{}
-impl<T> Taskpool for T where T: WorkerApi + WorkerFetch + Common {}
+pub trait DbOp:WorkerApi+WorkerFetch+Common{}
+impl<T> DbOp for T where T: WorkerApi + WorkerFetch + Common {}
 
 pub struct TaskpoolImpl {
     conn: Mutex<SqliteConnection>,
