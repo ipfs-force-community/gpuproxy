@@ -12,3 +12,5 @@ extern crate scopeguard;
 pub mod config;
 pub mod proof_rpc;
 pub mod models;
+pub mod resource;
+pub mod utils;

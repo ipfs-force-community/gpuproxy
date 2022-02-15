@@ -2,9 +2,6 @@ use std::str::FromStr;
 use filecoin_proofs_api::{ProverId, SectorId};
 use crate::proof_rpc::db_ops::*;
 use crate::models::{Task, Base64Byte};
-use crate::proof_rpc::resource;
-use crate::proof_rpc::utils::{*};
-
 use jsonrpc_core::{Result};
 use jsonrpc_derive::rpc;
 
@@ -13,6 +10,8 @@ use jsonrpc_core_client::transports::http;
 use std::sync::Arc;
 use anyhow::anyhow;
 use jsonrpc_core::ErrorCode::{InternalError, InvalidParams};
+use crate::resource;
+use crate::utils::{IntoAnyhow, IntoJsonRpcResult, ReveseOption};
 
 #[rpc(client, server)]
 pub trait ProofRpc {
@@ -60,7 +59,7 @@ impl ProofRpc for ProofImpl {
     ) -> Result<String> {
         let scp1o = serde_json::from_slice(Into::<Vec<u8>>::into(phase1_output).as_slice()).to_jsonrpc_result(InvalidParams)?;
         let addr = forest_address::Address::from_str(miner.as_str()).to_jsonrpc_result(InvalidParams)?;
-        let c2_resurce = resource::C2{
+        let c2_resurce = resource::C2Resource{
             prove_id: prover_id,
             sector_id: SectorId::from(sector_id),
             phase1_output: scp1o,
@@ -122,29 +121,29 @@ pub struct WrapClient{
 
 impl resource::Resource for WrapClient {
     fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Base64Byte> {
-          self.rt.block_on(self.client.get_resource_info(resource_id_arg)).anyhow()
+        self.rt.block_on(self.client.get_resource_info(resource_id_arg)).anyhow()
     }
 
     fn store_resource_info(&self, _: Vec<u8>) -> anyhow::Result<String> {
-       Err(anyhow!("not support set resource in worker"))
+        Err(anyhow!("not support set resource in worker"))
     }
 }
 
 impl WorkerFetch for WrapClient{
     fn fetch_one_todo(&self, worker_id: String) -> anyhow::Result<Task> {
-          self.rt.block_on(self.client.fetch_todo(worker_id)).anyhow()
+        self.rt.block_on(self.client.fetch_todo(worker_id)).anyhow()
     }
 
     fn fetch_uncomplte(&self, worker_id_arg: String) -> anyhow:: Result<Vec<Task>> {
-          self.rt.block_on(self.client.fetch_uncomplte(worker_id_arg)).anyhow()
+        self.rt.block_on(self.client.fetch_uncomplte(worker_id_arg)).anyhow()
     }
 
-     fn record_error(&self, worker_id: String, tid: String, err_msg: String) -> Option<anyhow::Error> {
-           self.rt.block_on(self.client.record_error(worker_id, tid, err_msg)).err().map(|e|anyhow!(e.to_string()))
+    fn record_error(&self, worker_id: String, tid: String, err_msg: String) -> Option<anyhow::Error> {
+        self.rt.block_on(self.client.record_error(worker_id, tid, err_msg)).err().map(|e|anyhow!(e.to_string()))
     }
 
-     fn record_proof(&self, worker_id: String, tid: String, proof: String) -> Option<anyhow::Error> {
-           self.rt.block_on(self.client.record_proof(worker_id, tid, proof)).err().map(|e|anyhow!(e.to_string()))
+    fn record_proof(&self, worker_id: String, tid: String, proof: String) -> Option<anyhow::Error> {
+        self.rt.block_on(self.client.record_proof(worker_id, tid, proof)).err().map(|e|anyhow!(e.to_string()))
     }
 }
 
@@ -174,31 +173,31 @@ pub trait GpuServiceRpcClient {
 
 impl GpuServiceRpcClient for WrapClient{
     fn submit_c2_task(&self, phase1_output: Base64Byte, miner: String, prover_id: ProverId, sector_id: u64) -> anyhow::Result<String> {
-         self.rt.block_on(self.client.submit_c2_task(phase1_output, miner, prover_id, sector_id)).anyhow()
+        self.rt.block_on(self.client.submit_c2_task(phase1_output, miner, prover_id, sector_id)).anyhow()
     }
 
     fn get_task(&self, id: String) -> anyhow::Result<Task> {
-         self.rt.block_on(self.client.get_task(id)).anyhow()
+        self.rt.block_on(self.client.get_task(id)).anyhow()
     }
 
     fn fetch_todo(&self, worker_id_arg: String) -> anyhow::Result<Task> {
-         self.rt.block_on(self.client.fetch_todo(worker_id_arg)).anyhow()
+        self.rt.block_on(self.client.fetch_todo(worker_id_arg)).anyhow()
     }
 
     fn fetch_uncomplte(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>> {
-         self.rt.block_on(self.client.fetch_uncomplte(worker_id_arg)).anyhow()
+        self.rt.block_on(self.client.fetch_uncomplte(worker_id_arg)).anyhow()
     }
 
     fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Base64Byte> {
-         self.rt.block_on(self.client.get_resource_info(resource_id_arg)).anyhow()
+        self.rt.block_on(self.client.get_resource_info(resource_id_arg)).anyhow()
     }
 
     fn record_proof(&self, worker_id_arg: String, tid: String, proof: String) -> anyhow::Result<bool> {
-         self.rt.block_on(self.client.record_proof(worker_id_arg, tid, proof)).anyhow()
+        self.rt.block_on(self.client.record_proof(worker_id_arg, tid, proof)).anyhow()
     }
 
     fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String) -> anyhow::Result<bool> {
-         self.rt.block_on(self.client.record_error(worker_id_arg, tid, err_msg)).anyhow()
+        self.rt.block_on(self.client.record_error(worker_id_arg, tid, err_msg)).anyhow()
     }
 
     fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<i32>>) -> anyhow::Result<Vec<Task>> {

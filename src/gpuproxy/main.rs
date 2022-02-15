@@ -17,6 +17,7 @@ use anyhow::{Result};
 use std::sync::{Mutex};
 use std::env;
 use std::str::FromStr;
+use gpuproxy::resource;
 
 fn main() {
     let list_task_cmds  = cli::list_task_cmds();

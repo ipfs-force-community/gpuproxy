@@ -3,7 +3,6 @@ use crate::models::{NewTask, Task, WorkerInfo, ResourceInfo, NewWorkerInfo, Task
 use crate::models::schema::tasks::dsl as tasks_dsl;
 use crate::models::schema::worker_infos::dsl as worker_infos_dsl;
 use crate::models::schema::resource_infos::dsl as resource_infos_dsl;
-use crate::proof_rpc::resource::{*};
 use std::sync::{Mutex};
 use diesel::insert_into;
 use diesel::prelude::*;
@@ -12,8 +11,9 @@ use anyhow::{anyhow, Result};
 use chrono::Utc;
 use log::info;
 use uuid::Uuid;
-use crate::proof_rpc::utils::IntoAnyhow;
 use crate::models::Base64Byte;
+use crate::resource::Resource;
+use crate::utils::{*};
 
 pub trait WorkerApi {
     fn get_worker_id(&self) -> Result<uuid::Uuid>;

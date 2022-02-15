@@ -5,10 +5,10 @@ use std::time::Duration;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::proof_rpc::db_ops::*;
 use crate::models::*;
-use crate::proof_rpc::resource::{*};
 use log::*;
 use crossbeam_channel::tick;
 use std::thread as stdthread;
+use crate::resource::{C2Resource, Resource};
 
 pub trait Worker {
     fn fetch_one_todo(&self) ->Result<Task>;
@@ -73,7 +73,7 @@ impl Worker for LocalWorker {
                                 }
 
                                 if undo_task.task_type == TaskType::C2 {
-                                    let c2: C2 = serde_json::from_slice( &resource).unwrap();
+                                    let c2: C2Resource = serde_json::from_slice( &resource).unwrap();
                                     info!("worker {} start to do task {}, size {}", worker_id.clone(), undo_task.id, u64::from(c2.phase1_output.registered_proof.sector_size()));
                                     match seal_commit_phase2(c2.phase1_output, c2.prove_id, c2.sector_id,){
                                         Ok(proof_arg) => {

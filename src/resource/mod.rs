@@ -10,15 +10,22 @@ use uuid::Uuid;
 use crate::models::Base64Byte;
 use serde::{Serialize, Deserialize};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct C2Resource {
+    pub prove_id: ProverId,
+    pub sector_id: SectorId,
+    pub phase1_output: SealCommitPhase1Output,
+}
+
 pub trait Resource {
     fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte>;
     fn store_resource_info(&self, resource: Vec<u8>) -> Result<String>;
 }
 
+
 pub struct FileResource {
     root: String
 }
-
 
 impl FileResource {
     pub fn new(root: String) -> Self {
@@ -48,12 +55,4 @@ impl Resource for FileResource {
         fs::write(new_path,resource )?;
         Ok(resource_id)
     }
-}
-
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct C2 {
-    pub prove_id: ProverId,
-    pub sector_id: SectorId,
-    pub phase1_output: SealCommitPhase1Output,
 }
