@@ -3,6 +3,7 @@ name = "gpuproxy"
 version = "0.1.0"
 edition = "2021"
 
+
 [lib]
 name = "gpuproxy"
 path = "src/lib.rs"
@@ -12,12 +13,20 @@ name = "gpuproxy"
 path = "src/gpuproxy/main.rs"
 
 [[bin]]
-name = "gpuproxy_worker"
-path = "src/gpuproxy_worker/main.rs"
+name = "migration"
+path = "migration/src/main.rs"
+
+
+#[[bin]]
+#name = "gpuproxy_worker"
+#path = "src/gpuproxy_worker/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+entity = { path = "./entity" }
+migration = { path = "./migration" }
+
 filecoin-proofs-api = "10.1.0"
 clap = { version = "3.0.4", features = ["derive", "env"] }
 jsonrpc-core = { version = "18.0.0", features = [] }
@@ -26,8 +35,7 @@ jsonrpc-http-server = "18.0.0"
 jsonrpc-core-client = {version="18.0.0", features = ["http"]}
 log = { version = "0.4", features = ["std"] }
 simplelog = "*"
-diesel = { version = "1.4.4", default-features = false, features = ["sqlite", "numeric"] }
-diesel_migrations = "1.4.0"
+sea-schema = { version = "0.5.1", default-features = false, features = [ "migration", "debug-print" ] }
 forest_address = "0.3.2"
 num_enum = "0.5.6"
 anyhow = "1.0.52"
@@ -44,5 +52,14 @@ defer = "0.1.0"
 scopeguard = "1.1.0"
 tokio = "1.16.1"
 
-[features]
-sqlite = ["diesel/sqlite"]
+[dependencies.sea-orm]
+version ="0.6.0"
+features = [
+    "macros",
+    "debug-print",
+    "runtime-tokio-rustls",
+    "sqlx-sqlite",
+    # "sqlx-postgres",
+    # "sqlx-mysql",
+]
+default-features = false

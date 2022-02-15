@@ -1,6 +1,4 @@
-/target
-
-
+target
 # Added by cargo
 #
 # already existing elements were commented out
@@ -13,3 +11,5 @@ task.db
 example
 .DS_Store
 *.db
+*.shm
+*.wal

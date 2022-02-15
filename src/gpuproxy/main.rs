@@ -2,9 +2,6 @@ mod cli;
 
 use gpuproxy::config::*;
 use gpuproxy::proof_rpc::*;
-use gpuproxy::models::*;
-use gpuproxy::models::migrations::*;
-
 use log::*;
 use simplelog::*;
 use clap::{App, AppSettings, Arg};
@@ -18,6 +15,9 @@ use std::sync::{Mutex};
 use std::env;
 use std::str::FromStr;
 use gpuproxy::resource;
+use migration::Migrator;
+
+use sea_orm::Database;
 
 fn main() {
     let list_task_cmds  = cli::list_task_cmds();
@@ -85,8 +85,7 @@ fn main() {
 }
 
 fn run_cfg(cfg: ServiceConfig) -> Result<Server> {
-    let db_conn = establish_connection(cfg.db_dsn.as_str());
-    run_db_migrations(&db_conn).expect("migrations error");
+    let db_conn = tokio::runtime::Runtime::new().unwrap().block_on(Database::connect(cfg.db_dsn.as_str())).unwrap();
     let task_pool = db_ops::TaskpoolImpl::new(Mutex::new(db_conn));
     let worker_id = task_pool.get_worker_id()?;
     let arc_pool = Arc::new(task_pool);

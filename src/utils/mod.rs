@@ -1,5 +1,6 @@
 use std::fmt::Display;
 use anyhow::anyhow;
+pub mod base64bytes;
 
 pub trait IntoAnyhow<T> {
     fn anyhow(self) -> anyhow::Result<T>;

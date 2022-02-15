@@ -7,8 +7,8 @@ use filecoin_proofs_api::ProverId;
 use filecoin_proofs_api::seal::SealCommitPhase1Output;
 use filecoin_proofs_api::SectorId;
 use uuid::Uuid;
-use crate::models::Base64Byte;
 use serde::{Serialize, Deserialize};
+use crate::utils::base64bytes::Base64Byte;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct C2Resource {

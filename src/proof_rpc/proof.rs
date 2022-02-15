@@ -1,7 +1,14 @@
 use std::str::FromStr;
 use filecoin_proofs_api::{ProverId, SectorId};
 use crate::proof_rpc::db_ops::*;
-use crate::models::{Task, Base64Byte};
+
+use entity::tasks as Tasks;
+use entity::resource_info as ResourceInfos;
+use entity::worker_info as WorkerInfos;
+use Tasks::Model as Task;
+use ResourceInfos::Model as ResourceInfo;
+use WorkerInfos::Model as WorkerInfo;
+
 use jsonrpc_core::{Result};
 use jsonrpc_derive::rpc;
 
@@ -12,6 +19,7 @@ use anyhow::anyhow;
 use jsonrpc_core::ErrorCode::{InternalError, InvalidParams};
 use crate::resource;
 use crate::utils::{IntoAnyhow, IntoJsonRpcResult, ReveseOption};
+use crate::utils::base64bytes::Base64Byte;
 
 #[rpc(client, server)]
 pub trait ProofRpc {

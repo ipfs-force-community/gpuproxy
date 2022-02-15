@@ -4,11 +4,18 @@ use anyhow::Result;
 use std::time::Duration;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::proof_rpc::db_ops::*;
-use crate::models::*;
 use log::*;
 use crossbeam_channel::tick;
 use std::thread as stdthread;
 use crate::resource::{C2Resource, Resource};
+
+use entity::tasks as Tasks;
+use entity::resource_info as ResourceInfos;
+use entity::tasks::TaskType;
+use entity::worker_info as WorkerInfos;
+use Tasks::Model as Task;
+use ResourceInfos::Model as ResourceInfo;
+use WorkerInfos::Model as WorkerInfo;
 
 pub trait Worker {
     fn fetch_one_todo(&self) ->Result<Task>;
