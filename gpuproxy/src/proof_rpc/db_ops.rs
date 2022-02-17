@@ -21,7 +21,7 @@ use sea_orm::entity::prelude::*;
 use sea_orm::prelude::*;
 use sea_orm::sea_query::Expr;
 use sea_orm::ActiveValue::Set;
-use sea_orm::QuerySelect;
+use sea_orm::{NotSet, QuerySelect, Unset};
 use sea_orm::DatabaseConnection;
 
 use async_trait::async_trait;
@@ -152,7 +152,10 @@ impl Common for TaskpoolImpl {
             task_type: Set(TaskType::C2),
             status:Set(TaskStatus::Init),
             create_at: Set(Utc::now().timestamp()),
-            ..Default::default()
+            proof: Set("".to_string()),
+            error_msg: Set("".to_string()),
+            start_at:Set(0),
+            complete_at: Set(0),
         };
         println!("fffffff");
         defer! {
