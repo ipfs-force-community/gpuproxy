@@ -1,8 +1,6 @@
 use std::str::FromStr;
 use gpuproxy::config::*;
 use gpuproxy::proof_rpc::*;
-use gpuproxy::models::*;
-use gpuproxy::models::migrations::*;
 use crate::worker::Worker;
 use crate::db_ops::*;
 use log::*;
@@ -10,8 +8,14 @@ use simplelog::*;
 use clap::{App, AppSettings, Arg};
 use std::sync::Arc;
 use std::sync::{Mutex};
+use sea_orm::Database;
 
-fn main() {
+use migration::MigratorTrait;
+use migration::Migrator;
+
+
+#[tokio::main]
+async fn main() {
     let app_m = App::new("gpuproxy-worker")
         .version("0.0.1")
         .setting(AppSettings::ArgRequiredElseHelp)
@@ -29,7 +33,7 @@ fn main() {
                     Arg::new("db-dsn")
                         .long("db-dsn")
                         .env("C2PROXY_DSN")
-                        .default_value("gpuproxy-worker.db")
+                        .default_value("sqlite3://gpuproxy-worker.db")
                         .help("specify sqlite path to store task"),
                     Arg::new("max-c2")
                         .long("max-c2")
@@ -56,9 +60,11 @@ fn main() {
             let lv = LevelFilter::from_str(cfg.log_level.as_str()).unwrap();
             TermLogger::init(lv, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
 
-            let db_conn = establish_connection(cfg.db_dsn.as_str());
-            run_db_migrations(&db_conn).expect("migrations error");
-            let task_pool = db_ops::TaskpoolImpl::new(Mutex::new(db_conn));
+            let db_conn = tokio::runtime::Runtime::new().unwrap().block_on(Database::connect(cfg.db_dsn.as_str())).unwrap();
+            let db_conn = Database::connect(cfg.db_dsn.as_str()).await.unwrap();
+            Migrator::up(&db_conn, None).await.unwrap();
+
+            let task_pool = db_ops::TaskpoolImpl::new(db_conn);
             let worker_id = task_pool.get_worker_id().unwrap();
             
             let worker_api =  Arc::new(proof::get_proxy_api(cfg.url).unwrap());

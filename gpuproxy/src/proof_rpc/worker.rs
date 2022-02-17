@@ -16,11 +16,13 @@ use entity::worker_info as WorkerInfos;
 use Tasks::Model as Task;
 use ResourceInfos::Model as ResourceInfo;
 use WorkerInfos::Model as WorkerInfo;
+use async_trait::async_trait;
 
+#[async_trait]
 pub trait Worker {
-    fn fetch_one_todo(&self) ->Result<Task>;
+    async fn fetch_one_todo(&self) -> Result<Task>;
 
-    fn process_tasks(self) -> stdthread::JoinHandle<()>;
+     fn process_tasks(self);
 }
 
 pub struct LocalWorker {
@@ -38,20 +40,22 @@ impl LocalWorker{
     }
 }
 
+#[async_trait]
 impl Worker for LocalWorker {
-    fn fetch_one_todo(&self) -> Result<Task> {
-        let uncomplete_task_result = self.task_pool.fetch_uncomplte(self.worker_id.clone());
-        if let Ok(uncomplete_tasks) = uncomplete_task_result {
-            if uncomplete_tasks.len() > 0 {
-                let fetch_work = uncomplete_tasks[0].clone();
+    async fn fetch_one_todo(&self) -> Result<Task> {
+        let un_complete_task_result = self.task_pool.fetch_uncomplte(self.worker_id.clone()).await;
+        if let Ok(un_complete_tasks) = un_complete_task_result {
+            if un_complete_tasks.len() > 0 {
+                let fetch_work = un_complete_tasks[0].clone();
                 info!("worker {} fetch uncomplete task {}", self.worker_id, fetch_work.id);
                 return Ok(fetch_work);
             }
         }
-        self.task_pool.fetch_one_todo(self.worker_id.clone())
+        self.task_pool.fetch_one_todo(self.worker_id.clone()).await
     }
-    fn process_tasks(self) -> stdthread::JoinHandle<()>{
-       let handler =  stdthread::spawn(move ||{
+
+    fn process_tasks(self){
+        tokio::spawn(futures::future::lazy(async move|_|{
                 info!("worker {} start to worker and wait for new tasks", self.worker_id);
                 let ticker = tick(Duration::from_secs(10));
                 let count = Arc::new(AtomicUsize::new(0));
@@ -62,40 +66,40 @@ impl Worker for LocalWorker {
                         info!("has reach the max number of c2 tasks {} {}", cur_size, self.max_task);
                         continue
                     }
-                    match self.fetch_one_todo() {
+                    match self.fetch_one_todo().await {
                         Ok(undo_task) => {
                             count.fetch_add(1, Ordering::SeqCst);
                             let count_clone = count.clone();
                             let task_pool = self.task_pool.clone();
                             let worker_id = self.worker_id.clone();
-                            let resource_result = self.resource.get_resource_info(undo_task.resource_id.clone());
+                            let resource_result = self.resource.get_resource_info(undo_task.resource_id.clone()).await;
                             if let Err(e) = resource_result {
                                 error!("unable to get resource of {}, reason:{}", undo_task.resource_id, e.to_string());
                                 continue
                             }
                             let resource: Vec<u8> =  resource_result.unwrap().into();
-                            stdthread::spawn(move|| {
+                            tokio::spawn( futures::future::lazy(async move|_| {
                                 defer! {
                                     count_clone.fetch_sub(1, Ordering::SeqCst);
                                 }
 
                                 if undo_task.task_type == TaskType::C2 {
-                                    let c2: C2Resource = serde_json::from_slice( &resource).unwrap();
+                                    let c2: C2Resource = serde_json::from_slice(&resource).unwrap();
                                     info!("worker {} start to do task {}, size {}", worker_id.clone(), undo_task.id, u64::from(c2.phase1_output.registered_proof.sector_size()));
-                                    match seal_commit_phase2(c2.phase1_output, c2.prove_id, c2.sector_id,){
+                                    match seal_commit_phase2(c2.phase1_output, c2.prove_id, c2.sector_id, ) {
                                         Ok(proof_arg) => {
                                             info!("worker {} complted {} success", worker_id.clone(), undo_task.id);
                                             let base64_proof = base64::encode(proof_arg.proof).to_string();
-                                            task_pool.record_proof(worker_id.clone(), undo_task.id, base64_proof);
+                                            task_pool.record_proof(worker_id.clone(), undo_task.id, base64_proof).await.unwrap();
                                         }
                                         Err(e) => {
                                             info!("worker {} execute {} fail reason {}", worker_id.clone(), undo_task.id, e.to_string());
-                                            task_pool.record_error(worker_id.clone(), undo_task.id, e.to_string());
+                                            task_pool.record_error(worker_id.clone(), undo_task.id, e.to_string()).await.unwrap();
                                         }
                                     }
                                 }
 
-                            });
+                            }));
                             
                         },
                         Err(e) => {
@@ -103,8 +107,7 @@ impl Worker for LocalWorker {
                         }
                     }
                 }
-            }); 
+            }));
         info!("worker has started");
-        handler
     }
 }

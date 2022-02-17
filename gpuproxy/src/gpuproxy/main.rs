@@ -12,15 +12,28 @@ use crate::worker::Worker;
 use crate::db_ops::*;
 use anyhow::{Result};
 use std::sync::{Mutex};
-use std::env;
+use std::{env, future};
+use std::net::SocketAddr;
 use std::str::FromStr;
+use jsonrpc_derive::rpc;
 use gpuproxy::resource;
-use migration::Migrator;
 
 use sea_orm::Database;
+use serde_json::error::Category::Data;
 
-fn main() {
-    let list_task_cmds  = cli::list_task_cmds();
+use jsonrpsee::http_server::{HttpServer, HttpServerBuilder, HttpServerHandle, RpcModule};
+use gpuproxy::proof_rpc::proof::ProofImpl;
+use gpuproxy::utils::IntoAnyhow;
+
+use migration::MigratorTrait;
+use migration::Migrator;
+
+#[tokio::main]
+async fn main() {
+    let lv = LevelFilter::from_str("trace").unwrap();
+    TermLogger::init(lv, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
+
+    let list_task_cmds  = cli::list_task_cmds().await;
     let app_m = App::new("gpuproxy")
         .version("0.0.1")
         .setting(AppSettings::ArgRequiredElseHelp)
@@ -38,7 +51,7 @@ fn main() {
                     Arg::new("db-dsn")
                         .long("db-dsn")
                         .env("C2PROXY_DSN")
-                        .default_value("gpuproxy.db")
+                        .default_value("sqlite://gpuproxy.db")
                         .help("specify sqlite path to store task"),
                     Arg::new("max-c2")
                         .long("max-c2")
@@ -49,8 +62,8 @@ fn main() {
                         .long("disable-worker")
                         .env("C2PROXY_DISABLE_WORKER")
                         .required(false)
-                        .takes_value(false)
-                        .default_value("false")
+                        .takes_value(true)
+                        .default_value("true")
                         .help("disable worker on gpuproxy manager"),
                     Arg::new("log-level")
                         .long("log-level")
@@ -72,22 +85,21 @@ fn main() {
             let disable_worker: bool = sub_m.value_of_t("disable-worker").unwrap_or_else(|e| e.exit());
             let cfg = ServiceConfig::new(url, db_dsn, max_c2, disable_worker, "db".to_string(), "".to_string(), log_level.clone());
 
-            let lv = LevelFilter::from_str(cfg.log_level.as_str()).unwrap();
-            TermLogger::init(lv, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
-
-            run_cfg(cfg).unwrap().wait();
+            run_cfg(cfg).await;
         } // run was used
         Some(("tasks", ref sub_m)) => {
-            cli::sub_command(sub_m)
+            cli::sub_command(sub_m).await
         } // run was used
         _ => {} // Either no subcommand or one not tested for...
     }
 }
 
-fn run_cfg(cfg: ServiceConfig) -> Result<Server> {
-    let db_conn = tokio::runtime::Runtime::new().unwrap().block_on(Database::connect(cfg.db_dsn.as_str())).unwrap();
-    let task_pool = db_ops::TaskpoolImpl::new(Mutex::new(db_conn));
-    let worker_id = task_pool.get_worker_id()?;
+async fn run_cfg(cfg: ServiceConfig) {
+    let db_conn = Database::connect(cfg.db_dsn.as_str()).await.unwrap();
+    Migrator::up(&db_conn, None).await.unwrap();
+
+    let task_pool = db_ops::TaskpoolImpl::new(db_conn);
+    let worker_id = task_pool.get_worker_id().await.unwrap();
     let arc_pool = Arc::new(task_pool);
 
     let resource: Arc<dyn resource::Resource + Send + Sync> =  if cfg.resource_type == "db" {
@@ -99,16 +111,24 @@ fn run_cfg(cfg: ServiceConfig) -> Result<Server> {
 
     let worker = worker::LocalWorker::new(cfg.max_c2, worker_id.to_string(), resource.clone(), arc_pool.clone());
 
-   let io = proof::register(resource, arc_pool);
+   let rpc_module = proof::register(resource, arc_pool);
     if !cfg.disable_worker {
         worker.process_tasks();
         info!("ready for local worker address worker_id {}", worker_id);
     }
 
-    let server = ServerBuilder::new(io)
-        .start_http(&cfg.url.parse()?)
-        .unwrap();
 
-    info!("starting listening {}", cfg.url);
-    Ok(server)
+    let (server_addr, _handle) = run_server(rpc_module).await.unwrap();
+    info!("starting listening {}", server_addr);
+    let () = futures::future::pending().await;
+    info!("Shutting Down");
 }//run cfg
+
+async fn run_server(module:RpcModule<ProofImpl>) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
+    let server = HttpServerBuilder::default().build("127.0.0.1:8888".parse::<SocketAddr>()?)?;
+
+    let addr = server.local_addr()?;
+    let server_handle = server.start(module)?;
+
+    Ok((addr, server_handle))
+}

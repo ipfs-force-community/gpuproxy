@@ -11,5 +11,6 @@ task.db
 example
 .DS_Store
 *.db
-*.shm
-*.wal
+*db-shm
+*db-wal
+*.lock

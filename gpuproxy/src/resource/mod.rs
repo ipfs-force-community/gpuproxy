@@ -9,6 +9,7 @@ use filecoin_proofs_api::SectorId;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 use crate::utils::base64bytes::Base64Byte;
+use async_trait::async_trait;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct C2Resource {
@@ -17,9 +18,10 @@ pub struct C2Resource {
     pub phase1_output: SealCommitPhase1Output,
 }
 
+#[async_trait]
 pub trait Resource {
-    fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte>;
-    fn store_resource_info(&self, resource: Vec<u8>) -> Result<String>;
+    async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte>;
+    async  fn store_resource_info(&self, resource: Vec<u8>) -> Result<String>;
 }
 
 
@@ -38,8 +40,9 @@ impl FileResource {
 unsafe impl Send for FileResource {}
 unsafe impl Sync for FileResource {}
 
+#[async_trait]
 impl Resource for FileResource {
-    fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
+    async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
         let new_path = Path::new(self.root.as_str()).join(resource_id.clone());
         let filename = new_path.to_str().ok_or(anyhow!("unable to find file for resource {} in directory {}", resource_id.clone(), self.root.clone()))?;
         let mut f = File::open(filename)?;
@@ -49,7 +52,7 @@ impl Resource for FileResource {
         Ok(Base64Byte::new(buffer))
     }
 
-    fn store_resource_info(&self, resource: Vec<u8>) -> Result<String> {
+    async fn store_resource_info(&self, resource: Vec<u8>) -> Result<String> {
         let resource_id =  Uuid::new_v4().to_string();
         let new_path = Path::new(self.root.as_str()).join(resource_id.clone());
         fs::write(new_path,resource )?;

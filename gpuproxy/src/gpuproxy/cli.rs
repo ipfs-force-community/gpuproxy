@@ -2,7 +2,7 @@ use clap::{App, AppSettings, Arg, ArgMatches};
 use gpuproxy::proof_rpc::proof::{get_proxy_api, GpuServiceRpcClient};
 
 
-pub fn list_task_cmds<'a>() -> App<'a> {
+pub async fn list_task_cmds<'a>() -> App<'a> {
     App::new("tasks")
         .setting(AppSettings::ArgRequiredElseHelp)
         .setting(AppSettings::SubcommandRequiredElseHelp)
@@ -23,22 +23,22 @@ pub fn list_task_cmds<'a>() -> App<'a> {
                 ])
         )
 }
-pub fn sub_command(task_m: &&ArgMatches) {
+pub async fn sub_command(task_m: &&ArgMatches) {
     match task_m.subcommand() {
         Some(("list", ref _sub_m)) => {
             let url: String = task_m.value_of_t("url").unwrap_or_else(|e| e.exit());
-            list_tasks(url)
+            list_tasks(url).await;
         } // run was used
         _ => {}
     }
 }
-pub fn list_tasks(url: String) {
-    let worker_api = get_proxy_api(url).unwrap();
-    let tasks = worker_api.list_task(None, None).unwrap();
+pub async fn list_tasks(url: String) {
+    let worker_api = get_proxy_api(url).await.unwrap();
+    let tasks = worker_api.list_task(None, None).await.unwrap();
 
    // tasks.iter().for_each(|e|{
        // e.task_type
        // println!({}, e.id, e.miner, e.worker_id, e.task_type, e.status, e.error_msg,  e.start_at,e.complete_at,  )
    // })
-    println!("{}", serde_json::to_string_pretty(&tasks).unwrap())
+    println!("{}", serde_json::to_string_pretty(&tasks).unwrap());
 }
