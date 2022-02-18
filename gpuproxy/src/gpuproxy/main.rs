@@ -62,8 +62,8 @@ async fn main() {
                         .long("disable-worker")
                         .env("C2PROXY_DISABLE_WORKER")
                         .required(false)
-                        .takes_value(true)
-                        .default_value("true")
+                        .takes_value(false)
+                        .default_value("false")
                         .help("disable worker on gpuproxy manager"),
                     Arg::new("log-level")
                         .long("log-level")
@@ -98,9 +98,9 @@ async fn run_cfg(cfg: ServiceConfig) {
     let db_conn = Database::connect(cfg.db_dsn.as_str()).await.unwrap();
     Migrator::up(&db_conn, None).await.unwrap();
 
-    let task_pool = db_ops::TaskpoolImpl::new(db_conn);
-    let worker_id = task_pool.get_worker_id().await.unwrap();
-    let arc_pool = Arc::new(task_pool);
+    let db_ops = db_ops::DbOpsImpl::new(db_conn);
+    let worker_id = db_ops.get_worker_id().await.unwrap();
+    let arc_pool = Arc::new(db_ops);
 
     let resource: Arc<dyn resource::Resource + Send + Sync> =  if cfg.resource_type == "db" {
         arc_pool.clone()
@@ -113,7 +113,7 @@ async fn run_cfg(cfg: ServiceConfig) {
 
    let rpc_module = proof::register(resource, arc_pool);
     if !cfg.disable_worker {
-        worker.process_tasks();
+        worker.process_tasks().await;
         info!("ready for local worker address worker_id {}", worker_id);
     }
 

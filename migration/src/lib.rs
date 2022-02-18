@@ -1,7 +1,5 @@
 pub use sea_schema::migration::*;
 mod m20220101_000001_create_table;
-use sea_orm::Database;
-use sea_orm::DatabaseConnection;
 
 pub struct Migrator;
 

@@ -33,7 +33,7 @@ async fn main() {
                     Arg::new("db-dsn")
                         .long("db-dsn")
                         .env("C2PROXY_DSN")
-                        .default_value("sqlite3://gpuproxy-worker.db")
+                        .default_value("sqlite://gpuproxy-worker.db")
                         .help("specify sqlite path to store task"),
                     Arg::new("max-c2")
                         .long("max-c2")
@@ -60,18 +60,18 @@ async fn main() {
             let lv = LevelFilter::from_str(cfg.log_level.as_str()).unwrap();
             TermLogger::init(lv, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
 
-            let db_conn = tokio::runtime::Runtime::new().unwrap().block_on(Database::connect(cfg.db_dsn.as_str())).unwrap();
             let db_conn = Database::connect(cfg.db_dsn.as_str()).await.unwrap();
             Migrator::up(&db_conn, None).await.unwrap();
 
-            let task_pool = db_ops::TaskpoolImpl::new(db_conn);
-            let worker_id = task_pool.get_worker_id().unwrap();
+            let db_ops = db_ops::DbOpsImpl::new(db_conn);
+            let worker_id = db_ops.get_worker_id().await.unwrap();
             
-            let worker_api =  Arc::new(proof::get_proxy_api(cfg.url).unwrap());
+            let worker_api =  Arc::new(proof::get_proxy_api(cfg.url).await.unwrap());
             let worker = worker::LocalWorker::new(cfg.max_c2, worker_id.to_string(), worker_api.clone(), worker_api);
-            let join_handle = worker.process_tasks();
+            worker.process_tasks().await;
             info!("ready for local worker address worker_id {}", worker_id);
-            join_handle.join().unwrap();
+            let () = futures::future::pending().await;
+            info!("Shutting Down");
         } // run was used
         _ => {} // Either no subcommand or one not tested for...
     }

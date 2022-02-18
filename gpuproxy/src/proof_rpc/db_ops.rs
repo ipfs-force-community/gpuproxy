@@ -21,8 +21,7 @@ use sea_orm::entity::prelude::*;
 use sea_orm::prelude::*;
 use sea_orm::sea_query::Expr;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{NotSet, QuerySelect, Unset};
-use sea_orm::DatabaseConnection;
+use sea_orm::{DatabaseConnection, NotSet, QuerySelect};
 
 use async_trait::async_trait;
 
@@ -51,21 +50,21 @@ pub trait Common {
 pub trait DbOp:WorkerApi+WorkerFetch+Common{}
 impl<T> DbOp for T where T: WorkerApi + WorkerFetch + Common {}
 
-pub struct TaskpoolImpl {
+pub struct DbOpsImpl {
     conn: DatabaseConnection,
 }
 
-impl TaskpoolImpl {
+impl DbOpsImpl {
     pub fn new(conn: DatabaseConnection) -> Self {
-        TaskpoolImpl {conn: conn}
+        DbOpsImpl {conn: conn}
     }
 }
 
-unsafe impl Send for TaskpoolImpl {}
-unsafe impl Sync for TaskpoolImpl {}
+unsafe impl Send for DbOpsImpl {}
+unsafe impl Sync for DbOpsImpl {}
 
 #[async_trait]
-impl WorkerApi for TaskpoolImpl {
+impl WorkerApi for DbOpsImpl {
    async fn get_worker_id(&self) -> Result<uuid::Uuid> {
         let worker_info_op: Option<WorkerInfo> = WorkerInfos::Entity::find().one(&self.conn).await?;
         if let Some(worker_info) = worker_info_op {
@@ -86,7 +85,7 @@ impl WorkerApi for TaskpoolImpl {
 }
 
 #[async_trait]
-impl WorkerFetch for TaskpoolImpl {
+impl WorkerFetch for DbOpsImpl {
     async fn fetch_one_todo(&self, worker_id_arg: String) -> Result<Task> {
         let undo_task_opt: Option<Task> = Tasks::Entity::find().filter(Tasks::Column::Status.eq(TaskStatus::Init)).one(&self.conn).await?;
         if let Some(undo_task) = undo_task_opt {
@@ -128,7 +127,7 @@ impl WorkerFetch for TaskpoolImpl {
                 .col_expr(Tasks::Column::Status, Expr::value(TaskStatus::Completed))
                 .col_expr(Tasks::Column::WorkerId, Expr::value(worker_id_arg.clone()))
                 .col_expr(Tasks::Column::Proof, Expr::value(proof_str))
-                .col_expr(Tasks::Column::CreateAt, Expr::value(Utc::now().timestamp()))
+                .col_expr(Tasks::Column::CompleteAt, Expr::value(Utc::now().timestamp()))
                 .filter(Tasks::Column::Id.eq(tid.clone()))
                 .exec(&self.conn)
                 .await
@@ -140,7 +139,7 @@ impl WorkerFetch for TaskpoolImpl {
 }
 
 #[async_trait]
-impl Common for TaskpoolImpl {
+impl Common for DbOpsImpl {
     async fn add_task(&self, miner_arg: forest_address::Address, resource_id: String) -> Result<String> {
         let miner_noprefix = &miner_arg.to_string()[1..];
         let new_task_id =  Uuid::new_v4().to_string();
@@ -202,7 +201,7 @@ impl Common for TaskpoolImpl {
 }
 
 #[async_trait]
-impl Resource for TaskpoolImpl {
+impl Resource for DbOpsImpl {
     async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
             ResourceInfos::Entity::find()
                 .filter(ResourceInfos::Column::Id.eq(resource_id))

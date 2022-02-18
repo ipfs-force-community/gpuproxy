@@ -34,8 +34,7 @@ pub enum TaskType {
 #[serde(rename_all = "camelCase")]
 #[sea_orm(table_name = "tasks")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    #[sea_orm(column_type = "Text")]
+    #[sea_orm(primary_key, auto_increment = false, column_type = "Text")]
     pub id: String,
     pub miner: String,
     pub resource_id: String,
