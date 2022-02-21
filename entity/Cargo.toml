@@ -21,6 +21,6 @@ features = [
     "runtime-tokio-rustls",
     "sqlx-sqlite",
     # "sqlx-postgres",
-    # "sqlx-mysql",
+    "sqlx-mysql",
 ]
 default-features = false

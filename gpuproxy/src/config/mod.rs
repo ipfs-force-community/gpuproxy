@@ -1,5 +1,5 @@
 #[derive(Clone, Debug)]
-pub struct ServiceConfig  {
+pub struct ServiceConfig {
     pub url: String,
     pub db_dsn: String,
     pub disable_worker: bool,
@@ -10,9 +10,16 @@ pub struct ServiceConfig  {
     pub resource_path: String,
 }
 
-
 impl ServiceConfig {
-    pub fn new(url: String, db_dsn: String, max_c2: usize, disable_worker: bool, resource_type: String, resource_path: String, log_level: String) -> Self {
+    pub fn new(
+        url: String,
+        db_dsn: String,
+        max_c2: usize,
+        disable_worker: bool,
+        resource_type: String,
+        resource_path: String,
+        log_level: String,
+    ) -> Self {
         Self {
             url,
             db_dsn,
@@ -37,7 +44,14 @@ pub struct ClientConfig {
 }
 
 impl ClientConfig {
-    pub fn new(url: String, db_dsn: String, max_c2: usize, resource_type: String, resource_path: String, log_level: String) -> Self {
+    pub fn new(
+        url: String,
+        db_dsn: String,
+        max_c2: usize,
+        resource_type: String,
+        resource_path: String,
+        log_level: String,
+    ) -> Self {
         ClientConfig {
             url,
             db_dsn,

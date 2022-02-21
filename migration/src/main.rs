@@ -1,4 +1,3 @@
-use sea_orm::Database;
 use migration::Migrator;
 use sea_schema::migration::*;
 

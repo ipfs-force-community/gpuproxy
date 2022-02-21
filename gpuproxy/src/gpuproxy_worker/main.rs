@@ -1,18 +1,15 @@
-use std::str::FromStr;
+use crate::db_ops::*;
+use crate::worker::Worker;
+use clap::{App, AppSettings, Arg};
 use gpuproxy::config::*;
 use gpuproxy::proof_rpc::*;
-use crate::worker::Worker;
-use crate::db_ops::*;
 use log::*;
-use simplelog::*;
-use clap::{App, AppSettings, Arg};
-use std::sync::Arc;
-use std::sync::{Mutex};
 use sea_orm::Database;
+use simplelog::*;
+use std::str::FromStr;
+use std::sync::Arc;
 
-use migration::MigratorTrait;
-use migration::Migrator;
-
+use migration::{Migrator, MigratorTrait};
 
 #[tokio::main]
 async fn main() {
@@ -51,23 +48,43 @@ async fn main() {
 
     match app_m.subcommand() {
         Some(("run", ref sub_m)) => {
-            let url: String = sub_m.value_of_t("gpuproxy-url").unwrap_or_else(|e| e.exit());
+            let url: String = sub_m
+                .value_of_t("gpuproxy-url")
+                .unwrap_or_else(|e| e.exit());
             let max_c2: usize = sub_m.value_of_t("max-c2").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
             let log_level: String = sub_m.value_of_t("log-level").unwrap_or_else(|e| e.exit());
-            let cfg = ClientConfig::new(url, db_dsn, max_c2,"db".to_string(),"".to_string(), log_level);
+            let cfg = ClientConfig::new(
+                url,
+                db_dsn,
+                max_c2,
+                "db".to_string(),
+                "".to_string(),
+                log_level,
+            );
 
             let lv = LevelFilter::from_str(cfg.log_level.as_str()).unwrap();
-            TermLogger::init(lv, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
+            TermLogger::init(
+                lv,
+                Config::default(),
+                TerminalMode::Mixed,
+                ColorChoice::Auto,
+            )
+            .unwrap();
 
             let db_conn = Database::connect(cfg.db_dsn.as_str()).await.unwrap();
             Migrator::up(&db_conn, None).await.unwrap();
 
             let db_ops = db_ops::DbOpsImpl::new(db_conn);
             let worker_id = db_ops.get_worker_id().await.unwrap();
-            
-            let worker_api =  Arc::new(proof::get_proxy_api(cfg.url).await.unwrap());
-            let worker = worker::LocalWorker::new(cfg.max_c2, worker_id.to_string(), worker_api.clone(), worker_api);
+
+            let worker_api = Arc::new(proof::get_proxy_api(cfg.url).await.unwrap());
+            let worker = worker::LocalWorker::new(
+                cfg.max_c2,
+                worker_id.to_string(),
+                worker_api.clone(),
+                worker_api,
+            );
             worker.process_tasks().await;
             info!("ready for local worker address worker_id {}", worker_id);
             let () = futures::future::pending().await;

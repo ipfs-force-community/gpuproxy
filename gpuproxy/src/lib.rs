@@ -3,7 +3,7 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 #![allow(unused_imports)]
-#[macro_use(defer)] 
+#[macro_use(defer)]
 extern crate scopeguard;
 
 pub mod config;

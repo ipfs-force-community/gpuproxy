@@ -1,11 +1,11 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use sea_orm::entity::prelude::*;
+use serde::{Deserialize, Serialize};
 use serde_repr::*;
-use serde::{Serialize, Deserialize};
 
 #[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(i32)]
-#[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr,  EnumIter, DeriveActiveEnum)]
+#[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum TaskStatus {
     #[sea_orm(num_value = 0)]
@@ -20,10 +20,9 @@ pub enum TaskStatus {
     Completed = 4,
 }
 
-
 #[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(i32)]
-#[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr,  EnumIter, DeriveActiveEnum)]
+#[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum TaskType {
     #[sea_orm(num_value = 0)]

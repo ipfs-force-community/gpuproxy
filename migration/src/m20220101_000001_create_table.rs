@@ -1,7 +1,7 @@
 use sea_schema::migration::prelude::*;
 
-use entity::tasks as Tasks;
 use entity::resource_info as ResourceInfo;
+use entity::tasks as Tasks;
 use entity::worker_info as WorkerInfos;
 
 pub struct Migration;
@@ -26,8 +26,16 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(ResourceInfo::Column::Data).string().not_null())
-                    .col(ColumnDef::new(ResourceInfo::Column::CreateAt).integer().not_null())
+                    .col(
+                        ColumnDef::new(ResourceInfo::Column::Data)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ResourceInfo::Column::CreateAt)
+                            .integer()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -59,7 +67,11 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(Tasks::Column::Miner).string().not_null())
-                    .col(ColumnDef::new(Tasks::Column::ResourceId).string().not_null())
+                    .col(
+                        ColumnDef::new(Tasks::Column::ResourceId)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(Tasks::Column::Proof).string().not_null())
                     .col(ColumnDef::new(Tasks::Column::WorkerId).string().not_null())
                     .col(ColumnDef::new(Tasks::Column::TaskType).integer().not_null())
@@ -67,7 +79,11 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Tasks::Column::Status).integer().not_null())
                     .col(ColumnDef::new(Tasks::Column::CreateAt).integer().not_null())
                     .col(ColumnDef::new(Tasks::Column::StartAt).integer().not_null())
-                    .col(ColumnDef::new(Tasks::Column::CompleteAt).integer().not_null())
+                    .col(
+                        ColumnDef::new(Tasks::Column::CompleteAt)
+                            .integer()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await
