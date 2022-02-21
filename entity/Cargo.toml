@@ -1,0 +1,26 @@
+[package]
+name = "entity"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "entity"
+path = "src/lib.rs"
+
+[dependencies]
+num_enum = "0.5.6"
+serde_repr = "0.1"
+serde = { version = "1.0.133", features = ["derive"] }
+
+[dependencies.sea-orm]
+version ="0.6.0"
+features = [
+    "macros",
+    "debug-print",
+    "runtime-tokio-rustls",
+    "sqlx-sqlite",
+    # "sqlx-postgres",
+    "sqlx-mysql",
+]
+default-features = false
