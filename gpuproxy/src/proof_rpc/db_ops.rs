@@ -78,9 +78,6 @@ impl DbOpsImpl {
     }
 }
 
-unsafe impl Send for DbOpsImpl {}
-unsafe impl Sync for DbOpsImpl {}
-
 #[async_trait]
 impl WorkerApi for DbOpsImpl {
     async fn get_worker_id(&self) -> Result<uuid::Uuid> {

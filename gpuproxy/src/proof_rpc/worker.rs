@@ -31,8 +31,6 @@ pub struct LocalWorker {
     pub resource: Arc<dyn Resource + Send + Sync>,
 }
 
-unsafe impl Send for LocalWorker {}
-
 impl LocalWorker {
     pub fn new(
         max_task: usize,
