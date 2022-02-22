@@ -20,22 +20,9 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(ResourceInfo::Entity)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(ResourceInfo::Column::Id)
-                            .string()
-                            .not_null()
-                            .primary_key(),
-                    )
-                    .col(
-                        ColumnDef::new(ResourceInfo::Column::Data)
-                            .string()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(ResourceInfo::Column::CreateAt)
-                            .integer()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(ResourceInfo::Column::Id).string().not_null().primary_key())
+                    .col(ColumnDef::new(ResourceInfo::Column::Data).string().not_null())
+                    .col(ColumnDef::new(ResourceInfo::Column::CreateAt).integer().not_null())
                     .to_owned(),
             )
             .await?;
@@ -45,12 +32,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(WorkerInfos::Entity)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(WorkerInfos::Column::Id)
-                            .string()
-                            .not_null()
-                            .primary_key(),
-                    )
+                    .col(ColumnDef::new(WorkerInfos::Column::Id).string().not_null().primary_key())
                     .to_owned(),
             )
             .await?;
@@ -60,18 +42,9 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Tasks::Entity)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(Tasks::Column::Id)
-                            .string()
-                            .not_null()
-                            .primary_key(),
-                    )
+                    .col(ColumnDef::new(Tasks::Column::Id).string().not_null().primary_key())
                     .col(ColumnDef::new(Tasks::Column::Miner).string().not_null())
-                    .col(
-                        ColumnDef::new(Tasks::Column::ResourceId)
-                            .string()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(Tasks::Column::ResourceId).string().not_null())
                     .col(ColumnDef::new(Tasks::Column::Proof).string().not_null())
                     .col(ColumnDef::new(Tasks::Column::WorkerId).string().not_null())
                     .col(ColumnDef::new(Tasks::Column::TaskType).integer().not_null())
@@ -79,11 +52,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Tasks::Column::Status).integer().not_null())
                     .col(ColumnDef::new(Tasks::Column::CreateAt).integer().not_null())
                     .col(ColumnDef::new(Tasks::Column::StartAt).integer().not_null())
-                    .col(
-                        ColumnDef::new(Tasks::Column::CompleteAt)
-                            .integer()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(Tasks::Column::CompleteAt).integer().not_null())
                     .to_owned(),
             )
             .await

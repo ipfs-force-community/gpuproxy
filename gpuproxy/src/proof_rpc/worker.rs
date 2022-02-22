@@ -62,19 +62,13 @@ impl Worker for LocalWorker {
             tokio::spawn(
                 futures::future::lazy(async move |_| {
                     info!("start task fetcher, wait for new task todo");
-                    let mut un_complete_task_result = fetcher
-                        .fetch_uncomplte(worker_id.to_string())
-                        .await
-                        .unwrap();
+                    let mut un_complete_task_result = fetcher.fetch_uncomplte(worker_id.to_string()).await.unwrap();
                     let ticker = tick(Duration::from_secs(10));
                     loop {
                         ticker.recv().unwrap();
                         let cur_size = count_clone.clone().load(Ordering::SeqCst);
                         if cur_size >= self.max_task {
-                            warn!(
-                                "has reach the max number of c2 tasks {} {}",
-                                cur_size, self.max_task
-                            );
+                            warn!("has reach the max number of c2 tasks {} {}", cur_size, self.max_task);
                             continue;
                         }
 
@@ -85,11 +79,7 @@ impl Worker for LocalWorker {
                             continue;
                         }
 
-                        if let Err(e) = fetcher
-                            .fetch_one_todo(worker_id.clone())
-                            .await
-                            .map(|v| thread_tx.send(v))
-                        {
+                        if let Err(e) = fetcher.fetch_one_todo(worker_id.clone()).await.map(|v| thread_tx.send(v)) {
                             error!("unable to get task {}", e);
                         }
                     }
@@ -104,25 +94,15 @@ impl Worker for LocalWorker {
             let fetcher = fetcher.clone();
             tokio::spawn(
                 futures::future::lazy(async move |_| {
-                    info!(
-                        "worker {} start to worker and wait for new tasks",
-                        worker_id.clone()
-                    );
+                    info!("worker {} start to worker and wait for new tasks", worker_id.clone());
                     loop {
                         let undo_task_result = rx.recv();
                         match undo_task_result {
                             Ok(undo_task) => {
                                 count_clone.fetch_add(1, Ordering::SeqCst);
-                                let resource_result = self
-                                    .resource
-                                    .get_resource_info(undo_task.resource_id.clone())
-                                    .await;
+                                let resource_result = self.resource.get_resource_info(undo_task.resource_id.clone()).await;
                                 if let Err(e) = resource_result {
-                                    error!(
-                                        "unable to get resource of {}, reason:{}",
-                                        undo_task.resource_id,
-                                        e.to_string()
-                                    );
+                                    error!("unable to get resource of {}, reason:{}", undo_task.resource_id, e.to_string());
                                     continue;
                                 }
                                 let resource: Vec<u8> = resource_result.unwrap().into();
@@ -137,35 +117,19 @@ impl Worker for LocalWorker {
                                         }
 
                                         if undo_task.task_type == TaskType::C2 {
-                                            let c2: C2Resource =
-                                                serde_json::from_slice(&resource).unwrap();
+                                            let c2: C2Resource = serde_json::from_slice(&resource).unwrap();
                                             info!(
                                                 "worker {} start to do task {}, size {}",
                                                 worker_id.clone(),
                                                 undo_task.id,
-                                                u64::from(
-                                                    c2.phase1_output.registered_proof.sector_size()
-                                                )
+                                                u64::from(c2.phase1_output.registered_proof.sector_size())
                                             );
-                                            match seal_commit_phase2(
-                                                c2.phase1_output,
-                                                c2.prove_id,
-                                                c2.sector_id,
-                                            ) {
+                                            match seal_commit_phase2(c2.phase1_output, c2.prove_id, c2.sector_id) {
                                                 Ok(proof_arg) => {
-                                                    info!(
-                                                        "worker {} complted {} success",
-                                                        worker_id.clone(),
-                                                        undo_task.id
-                                                    );
-                                                    let base64_proof =
-                                                        base64::encode(proof_arg.proof).to_string();
+                                                    info!("worker {} complted {} success", worker_id.clone(), undo_task.id);
+                                                    let base64_proof = base64::encode(proof_arg.proof).to_string();
                                                     task_recorder
-                                                        .record_proof(
-                                                            worker_id.clone(),
-                                                            undo_task.id,
-                                                            base64_proof,
-                                                        )
+                                                        .record_proof(worker_id.clone(), undo_task.id, base64_proof)
                                                         .await
                                                         .unwrap();
                                                 }
@@ -177,11 +141,7 @@ impl Worker for LocalWorker {
                                                         e.to_string()
                                                     );
                                                     task_recorder
-                                                        .record_error(
-                                                            worker_id.clone(),
-                                                            undo_task.id,
-                                                            e.to_string(),
-                                                        )
+                                                        .record_error(worker_id.clone(), undo_task.id, e.to_string())
                                                         .await
                                                         .unwrap();
                                                 }

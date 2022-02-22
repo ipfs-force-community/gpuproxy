@@ -1,4 +1,10 @@
 #[derive(Clone, Debug)]
+pub enum Resource {
+    Db,
+    FS(String),
+}
+
+#[derive(Clone, Debug)]
 pub struct ServiceConfig {
     pub url: String,
     pub db_dsn: String,
@@ -6,8 +12,7 @@ pub struct ServiceConfig {
     pub max_c2: usize,
 
     pub log_level: String,
-    pub resource_type: String,
-    pub resource_path: String,
+    pub resource: Resource,
 }
 
 impl ServiceConfig {
@@ -20,14 +25,19 @@ impl ServiceConfig {
         resource_path: String,
         log_level: String,
     ) -> Self {
+        let resource = if resource_type == "db" {
+            Resource::Db
+        } else {
+            Resource::FS(resource_path)
+        };
+
         Self {
             url,
             db_dsn,
             max_c2,
             disable_worker,
-            resource_type,
-            resource_path,
             log_level,
+            resource,
         }
     }
 }
@@ -39,25 +49,21 @@ pub struct ClientConfig {
     pub max_c2: usize,
 
     pub log_level: String,
-    pub resource_type: String,
-    pub resource_path: String,
+    pub resource: Resource,
 }
 
 impl ClientConfig {
-    pub fn new(
-        url: String,
-        db_dsn: String,
-        max_c2: usize,
-        resource_type: String,
-        resource_path: String,
-        log_level: String,
-    ) -> Self {
+    pub fn new(url: String, db_dsn: String, max_c2: usize, resource_type: String, resource_path: String, log_level: String) -> Self {
+        let resource = if resource_type == "db" {
+            Resource::Db
+        } else {
+            Resource::FS(resource_path)
+        };
         ClientConfig {
             url,
             db_dsn,
             max_c2,
-            resource_type,
-            resource_path,
+            resource,
             log_level,
         }
     }

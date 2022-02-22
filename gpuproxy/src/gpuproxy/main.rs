@@ -1,7 +1,7 @@
 mod cli;
 use crate::db_ops::*;
 use crate::worker::Worker;
-use clap::{App, AppSettings, Arg};
+use clap::{Arg, Command};
 use gpuproxy::config::*;
 use gpuproxy::proof_rpc::proof::ProofImpl;
 use gpuproxy::proof_rpc::*;
@@ -19,52 +19,52 @@ use migration::{Migrator, MigratorTrait};
 #[tokio::main]
 async fn main() {
     let lv = LevelFilter::from_str("trace").unwrap();
-    TermLogger::init(
-        lv,
-        Config::default(),
-        TerminalMode::Mixed,
-        ColorChoice::Auto,
-    )
-    .unwrap();
+    TermLogger::init(lv, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
 
     let list_task_cmds = cli::list_task_cmds().await;
-    let app_m = App::new("gpuproxy")
+    let app_m = Command::new("gpuproxy")
         .version("0.0.1")
-        .setting(AppSettings::ArgRequiredElseHelp)
-        .setting(AppSettings::SubcommandRequiredElseHelp)
+        .arg_required_else_help(true)
         .subcommand(
-            App::new("run")
-                .setting(AppSettings::ArgRequiredElseHelp)
-                .about("run daemon for provide service")
-                .args(&[
-                    Arg::new("url")
-                        .long("url")
-                        .env("C2PROXY_URL")
-                        .default_value("127.0.0.1:8888")
-                        .help("specify url for provide service api service"),
-                    Arg::new("db-dsn")
-                        .long("db-dsn")
-                        .env("C2PROXY_DSN")
-                        .default_value("sqlite://gpuproxy.db")
-                        .help("specify sqlite path to store task"),
-                    Arg::new("max-c2")
-                        .long("max-c2")
-                        .env("C2PROXY_MAX_C2")
-                        .default_value("1")
-                        .help("number of c2 task to run parallelly"),
-                    Arg::new("disable-worker")
-                        .long("disable-worker")
-                        .env("C2PROXY_DISABLE_WORKER")
-                        .required(false)
-                        .takes_value(false)
-                        .default_value("false")
-                        .help("disable worker on gpuproxy manager"),
-                    Arg::new("log-level")
-                        .long("log-level")
-                        .env("C2PROXY_LOG_LEVEL")
-                        .default_value("info")
-                        .help("set log level for application"),
-                ]),
+            Command::new("run").about("run daemon for provide service").args(&[
+                Arg::new("url")
+                    .long("url")
+                    .env("C2PROXY_URL")
+                    .default_value("127.0.0.1:8888")
+                    .help("specify url for provide service api service"),
+                Arg::new("db-dsn")
+                    .long("db-dsn")
+                    .env("C2PROXY_DSN")
+                    .default_value("sqlite://gpuproxy.db")
+                    .help("specify sqlite path to store task"),
+                Arg::new("max-c2")
+                    .long("max-c2")
+                    .env("C2PROXY_MAX_C2")
+                    .default_value("1")
+                    .help("number of c2 task to run parallelly"),
+                Arg::new("disable-worker")
+                    .long("disable-worker")
+                    .env("C2PROXY_DISABLE_WORKER")
+                    .required(false)
+                    .takes_value(false)
+                    .default_value("false")
+                    .help("disable worker on gpuproxy manager"),
+                Arg::new("log-level")
+                    .long("log-level")
+                    .env("C2PROXY_LOG_LEVEL")
+                    .default_value("info")
+                    .help("set log level for application"),
+                Arg::new("resource-type")
+                    .long("resource-type")
+                    .env("C2PROXY_RESOURCE_TYPE")
+                    .default_value("db")
+                    .help("resource type(db, fs)"),
+                Arg::new("fs-resource-path")
+                    .long("fs-resource-path")
+                    .env("C2PROXY_FS_RESOURCE_PATH")
+                    .default_value("")
+                    .help("when resource type is fs, will use this path to read resource"),
+            ]),
         )
         .subcommand(list_task_cmds)
         .get_matches();
@@ -76,23 +76,16 @@ async fn main() {
             let max_c2: usize = sub_m.value_of_t("max-c2").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
             let log_level: String = sub_m.value_of_t("log-level").unwrap_or_else(|e| e.exit());
-            let disable_worker: bool = sub_m
-                .value_of_t("disable-worker")
-                .unwrap_or_else(|e| e.exit());
-            let cfg = ServiceConfig::new(
-                url,
-                db_dsn,
-                max_c2,
-                disable_worker,
-                "db".to_string(),
-                "".to_string(),
-                log_level.clone(),
-            );
+            let resource_type: String = sub_m.value_of_t("resource-type").unwrap_or_else(|e| e.exit());
+            let fs_resource_type: String = sub_m.value_of_t("fs-resource-path").unwrap_or_else(|e| e.exit());
+            let disable_worker: bool = sub_m.value_of_t("disable-worker").unwrap_or_else(|e| e.exit());
+
+            let cfg = ServiceConfig::new(url, db_dsn, max_c2, disable_worker, resource_type, fs_resource_type, log_level.clone());
 
             run_cfg(cfg).await;
         } // run was used
-        Some(("tasks", ref sub_m)) => cli::sub_command(sub_m).await, // run was used
-        _ => {} // Either no subcommand or one not tested for...
+        Some(("tasks", ref sub_m)) => cli::tasks_command(sub_m).await, // run was used
+        _ => {}                                                        // Either no subcommand or one not tested for...
     }
 }
 
@@ -104,18 +97,12 @@ async fn run_cfg(cfg: ServiceConfig) {
     let worker_id = db_ops.get_worker_id().await.unwrap();
     let arc_pool = Arc::new(db_ops);
 
-    let resource: Arc<dyn resource::Resource + Send + Sync> = if cfg.resource_type == "db" {
-        arc_pool.clone()
-    } else {
-        Arc::new(resource::FileResource::new(cfg.resource_path.clone()))
+    let resource: Arc<dyn resource::Resource + Send + Sync> = match cfg.resource {
+        Resource::Db => arc_pool.clone(),
+        Resource::FS(path) => Arc::new(resource::FileResource::new(path)),
     };
 
-    let worker = worker::LocalWorker::new(
-        cfg.max_c2,
-        worker_id.to_string(),
-        resource.clone(),
-        arc_pool.clone(),
-    );
+    let worker = worker::LocalWorker::new(cfg.max_c2, worker_id.to_string(), resource.clone(), arc_pool.clone());
 
     let rpc_module = proof::register(resource, arc_pool);
     if !cfg.disable_worker {
@@ -129,9 +116,7 @@ async fn run_cfg(cfg: ServiceConfig) {
     info!("Shutting Down");
 } //run cfg
 
-async fn run_server(
-    module: RpcModule<ProofImpl>,
-) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
+async fn run_server(module: RpcModule<ProofImpl>) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
     let server = HttpServerBuilder::default().build("127.0.0.1:8888".parse::<SocketAddr>()?)?;
 
     let addr = server.local_addr()?;

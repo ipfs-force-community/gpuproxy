@@ -34,35 +34,17 @@ pub trait WorkerApi {
 pub trait WorkerFetch {
     async fn fetch_one_todo(&self, worker_id_arg: String) -> Result<Task>;
     async fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>>;
-    async fn record_error(
-        &self,
-        worker_id_arg: String,
-        tid: String,
-        err_msg: String,
-    ) -> Option<anyhow::Error>;
-    async fn record_proof(
-        &self,
-        worker_id_arg: String,
-        tid: String,
-        proof: String,
-    ) -> Option<anyhow::Error>;
+    async fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String) -> Option<anyhow::Error>;
+    async fn record_proof(&self, worker_id_arg: String, tid: String, proof: String) -> Option<anyhow::Error>;
 }
 
 #[async_trait]
 pub trait Common {
-    async fn add_task(
-        &self,
-        miner_arg: forest_address::Address,
-        resource_id: String,
-    ) -> Result<String>;
+    async fn add_task(&self, miner_arg: forest_address::Address, resource_id: String) -> Result<String>;
     async fn fetch(&self, tid: String) -> Result<Task>;
     async fn fetch_undo(&self) -> Result<Vec<Task>>;
     async fn get_status(&self, tid: String) -> Result<TaskStatus>;
-    async fn list_task(
-        &self,
-        worker_id_arg: Option<String>,
-        state: Option<Vec<i32>>,
-    ) -> Result<Vec<Task>>;
+    async fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<i32>>) -> Result<Vec<Task>>;
 }
 
 pub trait DbOp: WorkerApi + WorkerFetch + Common {}
@@ -81,17 +63,14 @@ impl DbOpsImpl {
 #[async_trait]
 impl WorkerApi for DbOpsImpl {
     async fn get_worker_id(&self) -> Result<uuid::Uuid> {
-        let worker_info_op: Option<WorkerInfo> =
-            WorkerInfos::Entity::find().one(&self.conn).await?;
+        let worker_info_op: Option<WorkerInfo> = WorkerInfos::Entity::find().one(&self.conn).await?;
         if let Some(worker_info) = worker_info_op {
             let load_worker_id = Uuid::parse_str(worker_info.id.as_str())?;
             info!("load worker id {}", load_worker_id.to_string());
             Ok(load_worker_id)
         } else {
             let uid = uuid::Uuid::new_v4();
-            let new_worker_info = WorkerInfos::ActiveModel {
-                id: Set(uid.to_string()),
-            };
+            let new_worker_info = WorkerInfos::ActiveModel { id: Set(uid.to_string()) };
             let _ = new_worker_info.insert(&self.conn).await?;
             info!("create worker id {}", uid);
             Ok(uid)
@@ -102,10 +81,7 @@ impl WorkerApi for DbOpsImpl {
 #[async_trait]
 impl WorkerFetch for DbOpsImpl {
     async fn fetch_one_todo(&self, worker_id_arg: String) -> Result<Task> {
-        let undo_task_opt: Option<Task> = Tasks::Entity::find()
-            .filter(Tasks::Column::Status.eq(TaskStatus::Init))
-            .one(&self.conn)
-            .await?;
+        let undo_task_opt: Option<Task> = Tasks::Entity::find().filter(Tasks::Column::Status.eq(TaskStatus::Init)).one(&self.conn).await?;
         if let Some(undo_task) = undo_task_opt {
             let mut undo_task_active: Tasks::ActiveModel = undo_task.into();
             undo_task_active.status = Set(TaskStatus::Running);
@@ -126,12 +102,7 @@ impl WorkerFetch for DbOpsImpl {
             .map_err(|e| anyhow!(e.to_string()))
     }
 
-    async fn record_error(
-        &self,
-        worker_id_arg: String,
-        tid: String,
-        err_msg_str: String,
-    ) -> Option<anyhow::Error> {
+    async fn record_error(&self, worker_id_arg: String, tid: String, err_msg_str: String) -> Option<anyhow::Error> {
         Tasks::Entity::update_many()
             .col_expr(Tasks::Column::Status, Expr::value(TaskStatus::Error))
             .col_expr(Tasks::Column::WorkerId, Expr::value(worker_id_arg.clone()))
@@ -140,38 +111,24 @@ impl WorkerFetch for DbOpsImpl {
             .exec(&self.conn)
             .await
             .map(|e| {
-                info!(
-                    "worker {} mark task {} as error reason:{}",
-                    worker_id_arg, tid, err_msg_str
-                );
+                info!("worker {} mark task {} as error reason:{}", worker_id_arg, tid, err_msg_str);
                 e
             })
             .err()
             .map(|e| anyhow!(e.to_string()))
     }
 
-    async fn record_proof(
-        &self,
-        worker_id_arg: String,
-        tid: String,
-        proof_str: String,
-    ) -> Option<anyhow::Error> {
+    async fn record_proof(&self, worker_id_arg: String, tid: String, proof_str: String) -> Option<anyhow::Error> {
         Tasks::Entity::update_many()
             .col_expr(Tasks::Column::Status, Expr::value(TaskStatus::Completed))
             .col_expr(Tasks::Column::WorkerId, Expr::value(worker_id_arg.clone()))
             .col_expr(Tasks::Column::Proof, Expr::value(proof_str))
-            .col_expr(
-                Tasks::Column::CompleteAt,
-                Expr::value(Utc::now().timestamp()),
-            )
+            .col_expr(Tasks::Column::CompleteAt, Expr::value(Utc::now().timestamp()))
             .filter(Tasks::Column::Id.eq(tid.clone()))
             .exec(&self.conn)
             .await
             .map(|e| {
-                info!(
-                    "worker {} complete task {} successfully",
-                    worker_id_arg, tid
-                );
+                info!("worker {} complete task {} successfully", worker_id_arg, tid);
                 e
             })
             .err()
@@ -181,11 +138,7 @@ impl WorkerFetch for DbOpsImpl {
 
 #[async_trait]
 impl Common for DbOpsImpl {
-    async fn add_task(
-        &self,
-        miner_arg: forest_address::Address,
-        resource_id: String,
-    ) -> Result<String> {
+    async fn add_task(&self, miner_arg: forest_address::Address, resource_id: String) -> Result<String> {
         let miner_noprefix = &miner_arg.to_string()[1..];
         let new_task_id = Uuid::new_v4().to_string();
         let new_task = Tasks::ActiveModel {
@@ -205,21 +158,12 @@ impl Common for DbOpsImpl {
         defer! {
             println!("fffffffggg")
         }
-        new_task
-            .insert(&self.conn)
-            .await
-            .anyhow()
-            .and(Ok(new_task_id))
+        new_task.insert(&self.conn).await.anyhow().and(Ok(new_task_id))
     }
 
     async fn fetch(&self, tid: String) -> Result<Task> {
         let conn = self.conn.clone();
-        futures::executor::block_on(
-            Tasks::Entity::find()
-                .filter(Tasks::Column::Id.eq(tid.clone()))
-                .one(&self.conn),
-        )?
-        .if_not_found()
+        futures::executor::block_on(Tasks::Entity::find().filter(Tasks::Column::Id.eq(tid.clone())).one(&self.conn))?.if_not_found()
     }
 
     async fn fetch_undo(&self) -> Result<Vec<Task>> {
@@ -241,11 +185,7 @@ impl Common for DbOpsImpl {
             .map(|e| e.status)
     }
 
-    async fn list_task(
-        &self,
-        worker_id_opt: Option<String>,
-        state_cod: Option<Vec<i32>>,
-    ) -> Result<Vec<Task>> {
+    async fn list_task(&self, worker_id_opt: Option<String>, state_cod: Option<Vec<i32>>) -> Result<Vec<Task>> {
         let mut query = Tasks::Entity::find();
         if let Some(worker_id_arg) = worker_id_opt {
             query = query.filter(Tasks::Column::WorkerId.eq(worker_id_arg));
@@ -279,11 +219,7 @@ impl Resource for DbOpsImpl {
             create_at: Set(Utc::now().timestamp()),
         };
 
-        resource_info
-            .insert(&self.conn)
-            .await
-            .map(|_| resource_id)
-            .anyhow()
+        resource_info.insert(&self.conn).await.map(|_| resource_id).anyhow()
     }
 }
 

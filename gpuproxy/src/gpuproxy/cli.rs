@@ -1,10 +1,9 @@
-use clap::{App, AppSettings, Arg, ArgMatches};
+use clap::{Arg, ArgMatches, Command};
 use gpuproxy::proof_rpc::proof::{get_proxy_api, GpuServiceRpcClient};
 
-pub async fn list_task_cmds<'a>() -> App<'a> {
-    App::new("tasks")
-        .setting(AppSettings::ArgRequiredElseHelp)
-        .setting(AppSettings::SubcommandRequiredElseHelp)
+pub async fn list_task_cmds<'a>() -> Command<'a> {
+    Command::new("tasks")
+        .arg_required_else_help(true)
         .about("run daemon for provide service")
         .args(&[Arg::new("url")
             .long("url")
@@ -12,11 +11,11 @@ pub async fn list_task_cmds<'a>() -> App<'a> {
             .default_value("http://127.0.0.1:8888")
             .required(false)
             .help("specify url for provide service api service")])
-        .subcommand(App::new("list").about("list task status").args(&[
+        .subcommand(Command::new("list").about("list task status").args(&[
                    // Arg::new("")
                 ]))
 }
-pub async fn sub_command(task_m: &&ArgMatches) {
+pub async fn tasks_command(task_m: &&ArgMatches) {
     match task_m.subcommand() {
         Some(("list", ref _sub_m)) => {
             let url: String = task_m.value_of_t("url").unwrap_or_else(|e| e.exit());
@@ -25,6 +24,7 @@ pub async fn sub_command(task_m: &&ArgMatches) {
         _ => {}
     }
 }
+
 pub async fn list_tasks(url: String) {
     let worker_api = get_proxy_api(url).await.unwrap();
     let tasks = worker_api.list_task(None, None).await.unwrap();
