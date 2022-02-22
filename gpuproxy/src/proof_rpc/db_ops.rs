@@ -44,6 +44,7 @@ pub trait Common {
     async fn fetch(&self, tid: String) -> Result<Task>;
     async fn fetch_undo(&self) -> Result<Vec<Task>>;
     async fn get_status(&self, tid: String) -> Result<TaskStatus>;
+    async fn update_status_by_id(&self, tids: Vec<String>, status: TaskStatus) -> Option<anyhow::Error>;
     async fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<i32>>) -> Result<Vec<Task>>;
 }
 
@@ -154,16 +155,11 @@ impl Common for DbOpsImpl {
             start_at: Set(0),
             complete_at: Set(0),
         };
-        println!("fffffff");
-        defer! {
-            println!("fffffffggg")
-        }
         new_task.insert(&self.conn).await.anyhow().and(Ok(new_task_id))
     }
 
     async fn fetch(&self, tid: String) -> Result<Task> {
-        let conn = self.conn.clone();
-        futures::executor::block_on(Tasks::Entity::find().filter(Tasks::Column::Id.eq(tid.clone())).one(&self.conn))?.if_not_found()
+       Tasks::Entity::find().filter(Tasks::Column::Id.eq(tid.clone())).one(&self.conn).await?.if_not_found()
     }
 
     async fn fetch_undo(&self) -> Result<Vec<Task>> {
@@ -185,6 +181,16 @@ impl Common for DbOpsImpl {
             .map(|e| e.status)
     }
 
+    async fn update_status_by_id(&self, tids: Vec<String>, status: TaskStatus) -> Option<anyhow::Error> {
+        Tasks::Entity::update_many()
+            .col_expr(Tasks::Column::Status, Expr::value(status))
+            .filter(Tasks::Column::Id.is_in(tids))
+            .exec(&self.conn)
+            .await
+            .err()
+            .map(|e| anyhow!(e.to_string()))
+    }
+
     async fn list_task(&self, worker_id_opt: Option<String>, state_cod: Option<Vec<i32>>) -> Result<Vec<Task>> {
         let mut query = Tasks::Entity::find();
         if let Some(worker_id_arg) = worker_id_opt {
@@ -194,7 +200,6 @@ impl Common for DbOpsImpl {
         if let Some(state_arg) = state_cod {
             query = query.filter(Tasks::Column::Status.is_in(state_arg));
         }
-        let conn = self.conn.clone();
         query.all(&self.conn).await.anyhow()
     }
 }
