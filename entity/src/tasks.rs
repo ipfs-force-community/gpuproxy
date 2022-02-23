@@ -7,7 +7,7 @@ use serde_repr::*;
 #[repr(i32)]
 #[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
-pub enum TaskStatus {
+pub enum TaskState {
     #[sea_orm(num_value = 0)]
     Undefined = 0,
     #[sea_orm(num_value = 1)]
@@ -41,7 +41,7 @@ pub struct Model {
     pub worker_id: String,
     pub task_type: TaskType,
     pub error_msg: String,
-    pub status: TaskStatus,
+    pub state: TaskState,
     pub create_at: i64,
     pub start_at: i64,
     pub complete_at: i64,

@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use migration::{Migrator, MigratorTrait};
 
-#[tokio::main]
+#[tokio::main()]
 async fn main() {
     let lv = LevelFilter::from_str("trace").unwrap();
     TermLogger::init(lv, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();

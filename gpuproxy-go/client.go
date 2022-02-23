@@ -27,7 +27,7 @@ type Task struct {
 	WorkerId     string
 	TaskType     int32
 	ErrorMsg     string
-	Status       TaskStatus
+	State        TaskStatus
 	CreateAt     int64
 	StartAt      int64
 	CompleteAt   int64

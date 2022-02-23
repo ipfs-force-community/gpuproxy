@@ -47,7 +47,10 @@ pub trait ProofRpc {
     async fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String) -> RpcResult<bool>;
 
     #[method(name = "Proof.ListTask")]
-    async fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<i32>>) -> RpcResult<Vec<Task>>;
+    async fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<entity::tasks::TaskState>>) -> RpcResult<Vec<Task>>;
+
+    #[method(name = "Proof.UpdateStatusById")]
+    async fn update_status_by_id(&self, tids: Vec<String>, status: entity::tasks::TaskState) -> RpcResult<bool>;
 }
 
 pub struct ProofImpl {
@@ -94,8 +97,12 @@ impl ProofRpcServer for ProofImpl {
         self.pool.record_error(worker_id_arg, tid, err_msg).await.reverse_map_err()
     }
 
-    async fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<i32>>) -> RpcResult<Vec<Task>> {
+    async fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<entity::tasks::TaskState>>) -> RpcResult<Vec<Task>> {
         self.pool.list_task(worker_id_arg, state).await.to_jsonrpc_result(InternalError)
+    }
+
+    async fn update_status_by_id(&self, tids: Vec<String>, state: entity::tasks::TaskState) -> RpcResult<bool> {
+        self.pool.update_status_by_id(tids, state).await.reverse_map_err()
     }
 }
 
@@ -159,7 +166,9 @@ pub trait GpuServiceRpcClient {
 
     async fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String) -> anyhow::Result<bool>;
 
-    async fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<i32>>) -> anyhow::Result<Vec<Task>>;
+    async fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<entity::tasks::TaskState>>) -> anyhow::Result<Vec<Task>>;
+
+    async fn update_status_by_id(&self, tids: Vec<String>, state: entity::tasks::TaskState) -> anyhow::Result<bool>;
 }
 
 #[async_trait]
@@ -198,7 +207,11 @@ impl GpuServiceRpcClient for WrapClient {
         self.client.record_error(worker_id_arg, tid, err_msg).await.anyhow()
     }
 
-    async fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<i32>>) -> anyhow::Result<Vec<Task>> {
+    async fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<entity::tasks::TaskState>>) -> anyhow::Result<Vec<Task>> {
         self.client.list_task(worker_id_arg, state).await.anyhow()
+    }
+
+    async fn update_status_by_id(&self, tids: Vec<String>, state: entity::tasks::TaskState) -> anyhow::Result<bool>{
+        self.client.update_status_by_id(tids, state).await.anyhow()
     }
 }

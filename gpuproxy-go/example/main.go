@@ -53,7 +53,7 @@ func main() {
 			log.Fatal(err)
 			return
 		}
-		if task.Status == c2proxy_go.Completed {
+		if task.State == c2proxy_go.Completed {
 			log.Println("task ", task.Id, " has been complete by ", task.WorkerId)
 			break
 		}

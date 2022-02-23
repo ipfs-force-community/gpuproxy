@@ -49,7 +49,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Tasks::Column::WorkerId).string().not_null())
                     .col(ColumnDef::new(Tasks::Column::TaskType).integer().not_null())
                     .col(ColumnDef::new(Tasks::Column::ErrorMsg).string().not_null())
-                    .col(ColumnDef::new(Tasks::Column::Status).integer().not_null())
+                    .col(ColumnDef::new(Tasks::Column::State).integer().not_null())
                     .col(ColumnDef::new(Tasks::Column::CreateAt).integer().not_null())
                     .col(ColumnDef::new(Tasks::Column::StartAt).integer().not_null())
                     .col(ColumnDef::new(Tasks::Column::CompleteAt).integer().not_null())
