@@ -159,7 +159,11 @@ impl Common for DbOpsImpl {
     }
 
     async fn fetch(&self, tid: String) -> Result<Task> {
-       Tasks::Entity::find().filter(Tasks::Column::Id.eq(tid.clone())).one(&self.conn).await?.if_not_found()
+        Tasks::Entity::find()
+            .filter(Tasks::Column::Id.eq(tid.clone()))
+            .one(&self.conn)
+            .await?
+            .if_not_found()
     }
 
     async fn fetch_undo(&self) -> Result<Vec<Task>> {
@@ -207,7 +211,6 @@ impl Common for DbOpsImpl {
 #[async_trait]
 impl Resource for DbOpsImpl {
     async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
-        info!("xxxxxxxxxxxxxxx");
         let xx = ResourceInfos::Entity::find()
             .filter(ResourceInfos::Column::Id.eq(resource_id))
             .one(&self.conn)
@@ -215,7 +218,6 @@ impl Resource for DbOpsImpl {
             .if_not_found()
             .map(|val: ResourceInfo| Base64Byte::new(val.data))
             .anyhow();
-        info!("xxxxxxxxxxxxxxxxxxxfffff");
         xx
     }
 

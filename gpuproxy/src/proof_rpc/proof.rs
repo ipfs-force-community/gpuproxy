@@ -211,7 +211,7 @@ impl GpuServiceRpcClient for WrapClient {
         self.client.list_task(worker_id_arg, state).await.anyhow()
     }
 
-    async fn update_status_by_id(&self, tids: Vec<String>, state: entity::tasks::TaskState) -> anyhow::Result<bool>{
+    async fn update_status_by_id(&self, tids: Vec<String>, state: entity::tasks::TaskState) -> anyhow::Result<bool> {
         self.client.update_status_by_id(tids, state).await.anyhow()
     }
 }

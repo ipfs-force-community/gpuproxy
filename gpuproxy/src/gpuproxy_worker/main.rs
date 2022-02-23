@@ -39,13 +39,11 @@ async fn main() {
                     .env("C2PROXY_LOG_LEVEL")
                     .default_value("info")
                     .help("set log level for application"),
-
                 Arg::new("resource-type")
                     .long("resource-type")
                     .env("C2PROXY_RESOURCE_TYPE")
                     .default_value("db")
                     .help("resource type(db, fs)"),
-
                 Arg::new("fs-resource-path")
                     .long("fs-resource-path")
                     .env("./tar")

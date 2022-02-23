@@ -1,6 +1,8 @@
 use anyhow::anyhow;
 use std::fmt::Display;
 use std::pin::Pin;
+use log::error;
+
 pub mod base64bytes;
 
 pub trait IntoAnyhow<T> {
@@ -61,5 +63,22 @@ where
 {
     fn to_jsonrpc_result(self, code: jsonrpc_core::ErrorCode) -> jsonrpsee::core::RpcResult<T> {
         self.map_err(|e| jsonrpsee::core::Error::Custom(e.to_string()))
+    }
+}
+
+pub trait LogErr {
+    fn log_error(self) ;
+}
+
+impl<T, E> LogErr for Result<T, E>
+    where
+        E: Display,
+{
+    fn log_error(self) {
+        match self {
+            Err(e) => error!("{}", e.to_string()),
+            _ => {}
+        }
+
     }
 }

@@ -46,6 +46,7 @@ func main() {
 		log.Fatal(err)
 		return
 	}
+	return
 
 	for {
 		task, err := client.GetTask(taskId)

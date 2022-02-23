@@ -12,10 +12,7 @@ pub async fn list_task_cmds<'a>() -> Command<'a> {
             .default_value("http://127.0.0.1:8888")
             .required(false)
             .help("specify url for provide service api service")])
-        .subcommand(
-                    Command::new("list")
-                        .about("list task status")
-                        .args(&[
+        .subcommand(Command::new("list").about("list task status").args(&[
                                 // Arg::new("")
                         ]))
 }
@@ -33,12 +30,11 @@ pub async fn list_tasks(task_m: &&ArgMatches) {
     let worker_api = get_proxy_api(url).await.unwrap();
     let tasks = worker_api.list_task(None, None).await.unwrap();
 
-   /* tasks.iter().for_each(|e|{
+    /* tasks.iter().for_each(|e|{
 
     });*/
     println!("{}", serde_json::to_string_pretty(&tasks).unwrap());
 }
-
 
 /*pub async fn update_status_by_id(task_m: &&ArgMatches) {
     let url: String = task_m.value_of_t("url").unwrap_or_else(|e| e.exit());
