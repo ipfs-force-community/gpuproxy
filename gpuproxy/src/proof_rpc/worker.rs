@@ -71,11 +71,13 @@ impl Worker for LocalWorker {
                             warn!("has reach the max number of c2 tasks {} {}", cur_size, self.max_task);
                             continue;
                         }
-                        count_clone.fetch_add(1, Ordering::SeqCst);
+
 
                         if un_complete_task_result.len() > 0 {
                             if let Err(e) = tx.send(un_complete_task_result.pop().unwrap()).await {
                                 error!("unable to send task to channel {:?}", e);
+                            }else{
+                                count_clone.fetch_add(1, Ordering::SeqCst);
                             }
                             continue;
                         }
@@ -83,6 +85,7 @@ impl Worker for LocalWorker {
                         match fetcher.fetch_one_todo(worker_id.clone()).await {
                             Ok(v) => {
                                 tx.send(v).await.log_error();
+                                count_clone.fetch_add(1, Ordering::SeqCst);
                             }
                             Err(e) => error!("unable to get task {}", e),
                         }
