@@ -8,11 +8,12 @@ use gpuproxy::proof_rpc::*;
 use gpuproxy::resource;
 use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle, RpcModule};
 use log::*;
-use sea_orm::Database;
+use sea_orm::{ConnectOptions, Database};
 use simplelog::*;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use migration::{Migrator, MigratorTrait};
 
@@ -90,7 +91,14 @@ async fn main() {
 }
 
 async fn run_cfg(cfg: ServiceConfig) {
-    let db_conn = Database::connect(cfg.db_dsn.as_str()).await.unwrap();
+    let mut opt = ConnectOptions::new(cfg.db_dsn);
+    opt.max_connections(10)
+        .min_connections(5)
+        .max_lifetime(Duration::from_secs(120))
+        .connect_timeout(Duration::from_secs(8))
+        .idle_timeout(Duration::from_secs(8));
+
+    let db_conn = Database::connect(opt).await.unwrap();
     Migrator::up(&db_conn, None).await.unwrap();
 
     let db_ops = db_ops::DbOpsImpl::new(db_conn);

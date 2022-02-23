@@ -18,7 +18,7 @@ async fn main() {
         .version("0.0.1")
         .arg_required_else_help(true)
         .subcommand(
-            Command::new("run").arg_required_else_help(true).about("worker for execute task").args(&[
+            Command::new("run").about("worker for execute task").args(&[
                 Arg::new("gpuproxy-url")
                     .long("gpuproxy-url")
                     .env("C2PROXY_LISTEN_URL")
@@ -39,14 +39,16 @@ async fn main() {
                     .env("C2PROXY_LOG_LEVEL")
                     .default_value("info")
                     .help("set log level for application"),
+
                 Arg::new("resource-type")
                     .long("resource-type")
                     .env("C2PROXY_RESOURCE_TYPE")
                     .default_value("db")
                     .help("resource type(db, fs)"),
+
                 Arg::new("fs-resource-path")
                     .long("fs-resource-path")
-                    .env("C2PROXY_FS_RESOURCE_PATH")
+                    .env("./tar")
                     .default_value("")
                     .help("when resource type is fs, will use this path to read resource"),
             ]),
