@@ -1,6 +1,6 @@
 use crate::proof_rpc::db_ops::*;
 use crate::resource::{C2Resource, Resource};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use crossbeam_channel::tick;
 use filecoin_proofs_api::seal::seal_commit_phase2;
 use log::*;
@@ -51,7 +51,7 @@ impl LocalWorker {
 #[async_trait]
 impl Worker for LocalWorker {
     async fn process_tasks(self) {
-        let (tx, mut rx) = channel(self.max_task);
+        let (tx, mut rx) = channel(5);
         let fetcher = Arc::new(self.task_fetcher);
         let count = Arc::new(AtomicUsize::new(0));
 
@@ -72,22 +72,27 @@ impl Worker for LocalWorker {
                             continue;
                         }
 
-
+                        let select_task:Task;
                         if un_complete_task_result.len() > 0 {
-                            if let Err(e) = tx.send(un_complete_task_result.pop().unwrap()).await {
-                                error!("unable to send task to channel {:?}", e);
-                            }else{
-                                count_clone.fetch_add(1, Ordering::SeqCst);
+                            select_task = un_complete_task_result.pop().unwrap();
+                        }else{
+                            match fetcher.fetch_one_todo(worker_id.clone()).await {
+                                Ok(v) => {
+                                    select_task  = v;
+                                }
+                                Err(e) => {
+                                    error!("unable to get task {}", e);
+                                    continue;
+                                },
                             }
-                            continue;
                         }
 
-                        match fetcher.fetch_one_todo(worker_id.clone()).await {
-                            Ok(v) => {
-                                tx.send(v).await.log_error();
-                                count_clone.fetch_add(1, Ordering::SeqCst);
-                            }
-                            Err(e) => error!("unable to get task {}", e),
+                        let task_id = select_task.id.clone();
+                        if let Err(e) = tx.send(select_task).await {
+                            error!("unable to send task to channel {:?}", e);
+                        }else{
+                            debug!("send new task {} to channel", task_id);
+                            count_clone.fetch_add(1, Ordering::SeqCst);
                         }
                     }
                 })
@@ -106,43 +111,50 @@ impl Worker for LocalWorker {
                     loop {
                         tokio::select! {
                             undo_task_result = rx.recv() => {
+                                   debug!("receive task from channel",);
                                    match undo_task_result {
                                         Some(undo_task) => {
-                                            let resource_result = self.resource.get_resource_info(undo_task.resource_id.clone()).await;
+                                            let task_id = undo_task.id.clone();
+                                            let resource_id = undo_task.resource_id.clone();
+
+                                            let resource_result = self.resource.get_resource_info(resource_id.clone()).await;
                                             if let Err(e) = resource_result {
-                                                error!("unable to get resource of {}, reason:{}", undo_task.resource_id, e.to_string());
+                                                error!("unable to get resource of {}, reason:{}", resource_id.clone(), e.to_string());
                                                 continue;
                                             }
                                             let resource: Vec<u8> = resource_result.unwrap().into();
 
                                             let worker_id = worker_id.clone();
                                             let result_tx_clone = result_tx.clone();
-
                                             info!("prepare successfully for task {} and spawn to run", undo_task.id);
                                             std::thread::spawn( //avoid block schedule
                                                  move || {
                                                     if undo_task.task_type == TaskType::C2 {
-                                                        //todo enusure send error result for each error condition
-                                                        let c2: C2Resource = serde_json::from_slice(&resource).unwrap();
-                                                        info!(
-                                                            "worker {} start to do task {}, size {}",
-                                                            worker_id.clone(),
-                                                            undo_task.id,
-                                                            u64::from(c2.phase1_output.registered_proof.sector_size())
-                                                        );
-                                                        let result = seal_commit_phase2(c2.phase1_output, c2.prove_id, c2.sector_id);
-                                                        futures::executor::block_on(result_tx_clone.send((undo_task, result))).unwrap();
+                                                        //todo ensure send error result for each error condition
+                                                        match serde_json::from_slice(&resource) {
+                                                            Ok::<C2Resource, _>(c2) => {
+                                                                info!("worker {} start to do task {}, size {}", worker_id, undo_task.id, u64::from(c2.phase1_output.registered_proof.sector_size()));
+                                                                let result = seal_commit_phase2(c2.phase1_output, c2.prove_id, c2.sector_id);
+                                                                futures::executor::block_on(result_tx_clone.send((undo_task, result))).unwrap();
+                                                            }
+                                                            Err(e) => {
+                                                                futures::executor::block_on(result_tx_clone.send(
+                                                                    (undo_task, Err(anyhow!("unable to parse param for task {} resource {} reason {}", task_id.clone(), resource_id.clone(), e.to_string())))
+                                                                )).unwrap();
+                                                            }
+                                                        }
                                                     }
                                                 },
                                             );
                                         }
                                         None => {
-                                            error!("unable to fetch undo task");
+                                            error!("unable to fetch undo task, should never occur");
                                             sleep(Duration::from_millis(100)).await;
                                         }
                                     }
                             }
                             val = result_rx.recv() => {
+                                 debug!("receive excute result from channel");
                                    defer! {
                                             count_clone.fetch_sub(1, Ordering::SeqCst);
                                    }
@@ -169,6 +181,7 @@ impl Worker for LocalWorker {
                                         }
                                 }
                             }
+                            _ = sleep(Duration::from_secs(10)) =>{info!("wait for new task or execute result")}
                         }
                     }
                 })
