@@ -1,4 +1,6 @@
 mod cli;
+mod params_fetch_cli;
+
 use crate::db_ops::*;
 use crate::worker::Worker;
 use clap::{Arg, Command};
@@ -23,6 +25,7 @@ async fn main() {
     TermLogger::init(lv, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
 
     let list_task_cmds = cli::list_task_cmds().await;
+    let fetch_params_cmds = params_fetch_cli::fetch_params_cmds().await;
     let app_m = Command::new("gpuproxy")
         .version("0.0.1")
         .arg_required_else_help(true)
@@ -68,6 +71,7 @@ async fn main() {
             ]),
         )
         .subcommand(list_task_cmds)
+        .subcommand(fetch_params_cmds)
         .get_matches();
 
     match app_m.subcommand() {
@@ -85,7 +89,8 @@ async fn main() {
 
             run_cfg(cfg).await;
         } // run was used
-        Some(("tasks", ref sub_m)) => cli::tasks_command(sub_m).await, // run was used
+        Some(("tasks", ref sub_m)) => cli::tasks_command(sub_m).await, // task was used
+        Some(("paramfetch", ref sub_m)) => params_fetch_cli::fetch_params_command(sub_m).await, // run was used
         _ => {}                                                        // Either no subcommand or one not tested for...
     }
 }

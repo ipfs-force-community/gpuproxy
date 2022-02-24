@@ -23,6 +23,8 @@ path = "src/gpuproxy_worker/main.rs"
 entity = { path = "../entity" }
 migration = { path = "../migration" }
 async-trait = "0.1.52"
+storage-proofs-core = "11.0.2"
+filecoin-proofs = "11.0.2"
 filecoin-proofs-api = "10.1.0"
 clap = { version = "3.0.4", features = ["derive", "env"] }
 jsonrpsee = { version = "^0.8.0", features = ["full"] }
@@ -51,6 +53,13 @@ defer = "0.1.0"
 scopeguard = "1.1.0"
 tokio = { version = "1.17.0", features = ["full"] }
 futures = "0.3.21"
+
+flate2 = "1.0.22"
+humansize = "1.1.1"
+reqwest = {version = "0.11.9", features = ["blocking", "native-tls-vendored"]}
+pbr = "1.0.4"
+tar = "0.4.38"
+
 [dependencies.sea-orm]
 version ="0.6.0"
 features = [

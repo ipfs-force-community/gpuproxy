@@ -10,3 +10,4 @@ pub mod config;
 pub mod proof_rpc;
 pub mod resource;
 pub mod utils;
+pub mod params_fetch;
