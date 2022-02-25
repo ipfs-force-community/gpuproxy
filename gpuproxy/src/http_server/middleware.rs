@@ -24,20 +24,20 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-#![warn(missing_docs, missing_debug_implementations, unreachable_pub)]
+//! Middleware for `jsonrpsee` servers.
 
-//! # jsonrpsee-http-server
-//!
-//! `jsonrpsee-http-server` is a [JSON RPC](https://www.jsonrpc.org/specification) HTTPS server library that's is built for `async/await`.
+/// Defines a middleware with callbacks during the RPC request life-cycle. The primary use case for
+/// this is to collect timings for a larger metrics collection solution but the only constraints on
+/// the associated type is that it be [`Send`] and [`Copy`], giving users some freedom to do what
+/// they need to do.
+///
+/// See the [`WsServerBuilder::set_middleware`](../../jsonrpsee_ws_server/struct.WsServerBuilder.html#method.set_middleware)
+/// or the [`HttpServerBuilder::set_middleware`](../../jsonrpsee_http_server/struct.HttpServerBuilder.html#method.set_middleware) method
+/// for examples.
+pub trait Middleware: Send + Sync + Clone + 'static {
+    /// Called when a new JSON-RPC comes to the server.
+    fn on_request(&self) -> bool;
 
-mod server;
-
-/// Common builders for RPC responses.
-pub mod response;
-pub mod middleware;
-pub use jsonrpsee::core::server::rpc_module::RpcModule;
-pub use jsonrpsee::types as types;
-pub use server::{Builder as HttpServerBuilder, Server as HttpServer, ServerHandle as HttpServerHandle};
-
-#[cfg(test)]
-mod tests;
+    /// Called on each JSON-RPC method completion, batch requests will trigger `on_result` multiple times.
+    fn on_result(&self) {}
+}

@@ -32,8 +32,8 @@ use std::task::{Context, Poll};
 
 use log::{*};
 
-use crate::http_server::access_control::AccessControl;
 use super::response;
+use super::middleware::Middleware;
 use super::response::{internal_error, malformed};
 
 use futures_channel::mpsc;
@@ -44,7 +44,6 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Error as HyperError, Method};
 use jsonrpsee::core::error::{Error, GenericTransportError};
 use jsonrpsee::core::http_helpers::{self, read_body};
-use jsonrpsee::core::middleware::Middleware;
 use jsonrpsee::core::server::helpers::{collect_batch_response, prepare_error, MethodSink};
 use jsonrpsee::core::server::resource_limiting::Resources;
 use jsonrpsee::core::server::rpc_module::{MethodKind, Methods};
@@ -53,12 +52,10 @@ use jsonrpsee::types::error::ErrorCode;
 use jsonrpsee::types::{Id, Notification, Params, Request};
 use serde_json::value::RawValue;
 use socket2::{Domain, Socket, Type};
-use crate::http_server::access_control;
 
 /// Builder to create JSON-RPC HTTP server.
 #[derive(Debug)]
 pub struct Builder<M = ()> {
-	access_control: AccessControl,
 	resources: Resources,
 	max_request_body_size: u32,
 	keep_alive: bool,
@@ -72,7 +69,6 @@ impl Default for Builder {
 		Self {
 			max_request_body_size: TEN_MB_SIZE_BYTES,
 			resources: Resources::default(),
-			access_control: AccessControl::default(),
 			keep_alive: true,
 			tokio_runtime: None,
 			middleware: (),
@@ -117,7 +113,6 @@ impl<M> Builder<M> {
 		Builder {
 			max_request_body_size: self.max_request_body_size,
 			resources: self.resources,
-			access_control: self.access_control,
 			keep_alive: self.keep_alive,
 			tokio_runtime: self.tokio_runtime,
 			middleware,
@@ -127,12 +122,6 @@ impl<M> Builder<M> {
 	/// Sets the maximum size of a request body in bytes (default is 10 MiB).
 	pub fn max_request_body_size(mut self, size: u32) -> Self {
 		self.max_request_body_size = size;
-		self
-	}
-
-	/// Sets access control settings.
-	pub fn set_access_control(mut self, acl: AccessControl) -> Self {
-		self.access_control = acl;
 		self
 	}
 
@@ -193,7 +182,6 @@ impl<M> Builder<M> {
 			return Ok(Server {
 				listener,
 				local_addr,
-				access_control: self.access_control,
 				max_request_body_size: self.max_request_body_size,
 				resources: self.resources,
 				tokio_runtime: self.tokio_runtime,
@@ -266,8 +254,6 @@ pub struct Server<M = ()> {
 	local_addr: Option<SocketAddr>,
 	/// Max request body size.
 	max_request_body_size: u32,
-	/// Access control
-	access_control: AccessControl,
 	/// Tracker for currently used resources on the server
 	resources: Resources,
 	/// Custom tokio runtime to run the server on.
@@ -284,7 +270,6 @@ impl<M: Middleware> Server<M> {
 	/// Start the server.
 	pub fn start(mut self, methods: impl Into<Methods>) -> Result<ServerHandle, Error> {
 		let max_request_body_size = self.max_request_body_size;
-		let access_control = self.access_control;
 		let (tx, mut rx) = mpsc::channel(1);
 		let listener = self.listener;
 		let resources = self.resources;
@@ -293,54 +278,23 @@ impl<M: Middleware> Server<M> {
 
 		let make_service = make_service_fn(move |_| {
 			let methods = methods.clone();
-			let access_control = access_control.clone();
 			let resources = resources.clone();
 			let middleware = middleware.clone();
 
 			async move {
 				Ok::<_, HyperError>(service_fn(move |request| {
 					let methods = methods.clone();
-					let access_control = access_control.clone();
 					let resources = resources.clone();
 					let middleware = middleware.clone();
 
 					// Run some validation on the http request, then read the body and try to deserialize it into one of
 					// two cases: a single RPC request or a batch of RPC requests.
 					async move {
-						if let Err(e) = access_control_is_valid(&access_control, &request) {
-							return Ok::<_, HyperError>(e);
-						}
-
 						// Only `POST` and `OPTIONS` methods are allowed.
 						match *request.method() {
-							// An OPTIONS request is a CORS preflight request. We've done our access check
-							// above so we just need to tell the browser that the request is OK.
-							Method::OPTIONS => {
-								let origin = match http_helpers::read_header_value(request.headers(), "origin") {
-									Some(origin) => origin,
-									None => return Ok(malformed()),
-								};
-								let allowed_headers = access_control.allowed_headers().to_cors_header_value();
-								let allowed_header_bytes = allowed_headers.as_bytes();
-
-								let res = hyper::Response::builder()
-									.header("access-control-allow-origin", origin)
-									.header("access-control-allow-methods", "POST")
-									.header("access-control-allow-headers", allowed_header_bytes)
-									.body(hyper::Body::empty())
-									.unwrap_or_else(|e| {
-										error!("Error forming preflight response: {}", e);
-										internal_error()
-									});
-
-								Ok(res)
-							}
-							// The actual request. If it's a CORS request we need to remember to add
-							// the access-control-allow-origin header (despite preflight) to allow it
-							// to be read in a browser.
 							Method::POST if content_type_is_json(&request) => {
 								let origin = return_origin_if_different_from_host(request.headers()).cloned();
-								let mut res = process_validated_request(
+								let res = process_validated_request(
 									request,
 									middleware,
 									methods,
@@ -348,11 +302,7 @@ impl<M: Middleware> Server<M> {
 									max_request_body_size,
 								)
 								.await?;
-
-								if let Some(origin) = origin {
-									res.headers_mut().insert("access-control-allow-origin", origin);
-								}
-								Ok(res)
+								Ok::<_, HyperError>(res)
 							}
 							// Error scenarios:
 							Method::POST => Ok(response::unsupported_content_type()),
@@ -391,23 +341,6 @@ fn return_origin_if_different_from_host(headers: &HeaderMap) -> Option<&HeaderVa
 	}
 }
 
-// Checks to that access control of the received request is the same as configured.
-fn access_control_is_valid(
-	access_control: &AccessControl,
-	request: &hyper::Request<hyper::Body>,
-) -> Result<(), hyper::Response<hyper::Body>> {
-	if access_control.deny_host(request) {
-		return Err(response::host_not_allowed());
-	}
-	if access_control.deny_cors_origin(request) {
-		return Err(response::invalid_allow_origin());
-	}
-	if access_control.deny_cors_header(request) {
-		return Err(response::invalid_allow_headers());
-	}
-	Ok(())
-}
-
 /// Checks that content type of received request is valid for JSON-RPC.
 fn content_type_is_json(request: &hyper::Request<hyper::Body>) -> bool {
 	is_json(request.headers().get("content-type"))
@@ -436,7 +369,6 @@ async fn process_validated_request(
 	max_request_body_size: u32,
 ) -> Result<hyper::Response<hyper::Body>, HyperError> {
 	let (parts, body) = request.into_parts();
-
 	let (body, mut is_single) = match read_body(&parts.headers, body, max_request_body_size).await {
 		Ok(r) => r,
 		Err(GenericTransportError::TooLarge) => return Ok(response::too_large()),
@@ -459,7 +391,6 @@ async fn process_validated_request(
 	if is_single {
 		if let Ok(req) = serde_json::from_slice::<Request>(&body) {
 			let method = req.method.as_ref();
-			middleware.on_call(method);
 
 			let id = req.id.clone();
 			let params = Params::new(req.params.map(|params| params.get()));
@@ -501,7 +432,7 @@ async fn process_validated_request(
 					}
 				},
 			};
-			middleware.on_result(&req.method, result, request_start);
+			middleware.on_result();
 		} else if let Ok(_req) = serde_json::from_slice::<Notif>(&body) {
 			return Ok::<_, HyperError>(response::ok_response("".into()));
 		} else {
@@ -526,7 +457,7 @@ async fn process_validated_request(
 						MethodKind::Sync(callback) => match method_callback.claim(name, &resources) {
 							Ok(guard) => {
 								let result = (callback)(id, params, &sink);
-								middleware.on_result(name, result, request_start);
+								middleware.on_result();
 								drop(guard);
 								None
 							}
@@ -536,7 +467,7 @@ async fn process_validated_request(
 									err
 								);
 								sink.send_error(req.id, ErrorCode::ServerIsBusy.into());
-								middleware.on_result(name, false, request_start);
+								middleware.on_result();
 								None
 							}
 						},
@@ -549,7 +480,7 @@ async fn process_validated_request(
 
 								Some(async move {
 									let result = (callback)(id, params, sink, 0, Some(guard)).await;
-									middleware.on_result(name, result, request_start);
+									middleware.on_result();
 								})
 							}
 							Err(err) => {
@@ -558,14 +489,14 @@ async fn process_validated_request(
 									err
 								);
 								sink.send_error(req.id, ErrorCode::ServerIsBusy.into());
-								middleware.on_result(name, false, request_start);
+								middleware.on_result();
 								None
 							}
 						},
 						MethodKind::Subscription(_) => {
 							error!("Subscriptions not supported on HTTP");
 							sink.send_error(req.id, ErrorCode::InternalError.into());
-							middleware.on_result(&req.method, false, request_start);
+							middleware.on_result();
 							None
 						}
 					},
@@ -599,6 +530,5 @@ async fn process_validated_request(
 		collect_batch_response(rx).await
 	};
 	debug!("[service_fn] sending back: {:?}", &response[..cmp::min(response.len(), 1024)]);
-	middleware.on_response(request_start);
 	Ok(response::ok_response(response))
 }
