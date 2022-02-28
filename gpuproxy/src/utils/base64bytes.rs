@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde::{Deserializer, Serializer};
 
+/// compatibility with golang's data method， used to receive or send byte slice data
 #[derive(Debug)]
 pub struct Base64Byte(Vec<u8>);
 
