@@ -120,6 +120,7 @@ impl Worker for LocalWorker {
                                             let resource_result = self.resource.get_resource_info(resource_id.clone()).await;
                                             if let Err(e) = resource_result {
                                                 error!("unable to get resource of {}, reason:{}", resource_id.clone(), e.to_string());
+                                                count_clone.fetch_sub(1, Ordering::SeqCst);
                                                 continue;
                                             }
                                             let resource: Vec<u8> = resource_result.unwrap().into();
@@ -129,21 +130,17 @@ impl Worker for LocalWorker {
                                             info!("prepare successfully for task {} and spawn to run", undo_task.id);
                                             std::thread::spawn( //avoid block schedule
                                                  move || {
-                                                    if undo_task.task_type == TaskType::C2 {
+                                                    let result = if undo_task.task_type == TaskType::C2 {
                                                         //todo ensure send error result for each error condition
-                                                        match serde_json::from_slice(&resource) {
-                                                            Ok::<C2Resource, _>(c2) => {
+                                                        serde_json::from_slice(&resource).anyhow()
+                                                            .and_then(|c2:C2Resource|{
                                                                 info!("worker {} start to do task {}, size {}", worker_id, undo_task.id, u64::from(c2.phase1_output.registered_proof.sector_size()));
-                                                                let result = seal_commit_phase2(c2.phase1_output, c2.prove_id, c2.sector_id);
-                                                                futures::executor::block_on(result_tx_clone.send((undo_task, result))).unwrap();
-                                                            }
-                                                            Err(e) => {
-                                                                futures::executor::block_on(result_tx_clone.send(
-                                                                    (undo_task, Err(anyhow!("unable to parse param for task {} resource {} reason {}", task_id.clone(), resource_id.clone(), e.to_string())))
-                                                                )).unwrap();
-                                                            }
-                                                        }
-                                                    }
+                                                                seal_commit_phase2(c2.phase1_output, c2.prove_id, c2.sector_id)
+                                                        })
+                                                    }else{
+                                                       Err(anyhow!("unsupport type of task {} type {}", undo_task.id, undo_task.task_type))
+                                                    };
+                                                    futures::executor::block_on(result_tx_clone.send((undo_task, result))).unwrap();
                                                 },
                                             );
                                         }
@@ -154,7 +151,7 @@ impl Worker for LocalWorker {
                                     }
                             }
                             val = result_rx.recv() => {
-                                 debug!("receive excute result from channel");
+                                   debug!("receive excute result from channel");
                                    defer! {
                                             count_clone.fetch_sub(1, Ordering::SeqCst);
                                    }
