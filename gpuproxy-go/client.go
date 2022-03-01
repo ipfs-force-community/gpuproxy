@@ -3,8 +3,6 @@ package gpuproxy_go
 import (
 	"context"
 	"net/http"
-
-	"github.com/filecoin-project/go-jsonrpc"
 )
 
 type TaskStatus int32
@@ -32,6 +30,7 @@ type Task struct {
 	StartAt      int64
 	CompleteAt   int64
 }
+
 type C2ProxyWorker interface {
 	FetchTodo(workerId string) (Task, error)
 	RecordProof(workerId string, tid string, proof string) (bool, error)

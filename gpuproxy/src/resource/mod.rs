@@ -14,9 +14,9 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct C2Resource {
-    pub prove_id: ProverId,
+    pub prover_id: ProverId,
     pub sector_id: SectorId,
-    pub phase1_output: SealCommitPhase1Output,
+    pub c1out: SealCommitPhase1Output,
 }
 
 #[async_trait]

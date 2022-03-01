@@ -134,8 +134,8 @@ impl Worker for LocalWorker {
                                                         //todo ensure send error result for each error condition
                                                         serde_json::from_slice(&resource).anyhow()
                                                             .and_then(|c2:C2Resource|{
-                                                                info!("worker {} start to do task {}, size {}", worker_id, undo_task.id, u64::from(c2.phase1_output.registered_proof.sector_size()));
-                                                                seal_commit_phase2(c2.phase1_output, c2.prove_id, c2.sector_id)
+                                                                info!("worker {} start to do task {}, size {}", worker_id, undo_task.id, u64::from(c2.c1out.registered_proof.sector_size()));
+                                                                seal_commit_phase2(c2.c1out, c2.prover_id, c2.sector_id)
                                                         })
                                                     }else{
                                                        Err(anyhow!("unsupport type of task {} type {:?}", undo_task.id, undo_task.task_type))

@@ -65,9 +65,9 @@ impl ProofRpcServer for ProofImpl {
         let scp1o = serde_json::from_slice(Into::<Vec<u8>>::into(phase1_output).as_slice()).to_jsonrpc_result(InvalidParams)?;
         let addr = forest_address::Address::from_str(miner.as_str()).to_jsonrpc_result(InvalidParams)?;
         let c2_resurce = resource::C2Resource {
-            prove_id: prover_id,
+            prover_id: prover_id,
             sector_id: SectorId::from(sector_id),
-            phase1_output: scp1o,
+            c1out: scp1o,
         };
         let resource_bytes = serde_json::to_vec(&c2_resurce).to_jsonrpc_result(InternalError)?;
         let resource_id = self.resource.store_resource_info(resource_bytes).await.to_jsonrpc_result(InternalError)?;
