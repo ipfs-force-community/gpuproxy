@@ -2,6 +2,7 @@ use crate::proof_rpc::db_ops::*;
 use filecoin_proofs_api::{ProverId, SectorId};
 use std::str::FromStr;
 
+use entity::tasks::TaskType;
 use entity::resource_info as ResourceInfos;
 use entity::tasks as Tasks;
 use entity::worker_info as WorkerInfos;
@@ -24,6 +25,9 @@ use std::sync::Arc;
 pub trait ProofRpc {
     #[method(name = "Proof.SubmitC2Task")]
     async fn submit_c2_task(&self, phase1_output: Base64Byte, miner: String, prover_id: ProverId, sector_id: u64) -> RpcResult<String>;
+
+    #[method(name = "Proof.AddTask")]
+    async fn add_task(&self, miner: String, task_type: entity::tasks::TaskType, param: Base64Byte) -> RpcResult<String>;
 
     #[method(name = "Proof.GetTask")]
     async fn get_task(&self, id: String) -> RpcResult<Task>;
@@ -67,6 +71,18 @@ impl ProofRpcServer for ProofImpl {
         };
         let resource_bytes = serde_json::to_vec(&c2_resurce).to_jsonrpc_result(InternalError)?;
         let resource_id = self.resource.store_resource_info(resource_bytes).await.to_jsonrpc_result(InternalError)?;
+        self.pool.add_task(addr, resource_id).await.to_jsonrpc_result(InternalError)
+    }
+
+    async fn add_task(&self, miner: String, task_type: TaskType, param: Base64Byte) -> RpcResult<String> {
+        let addr = forest_address::Address::from_str(miner.as_str()).to_jsonrpc_result(InvalidParams)?;
+        //check
+        match task_type {
+            TaskType::C2 => {
+                serde_json::from_slice(&param.0).to_jsonrpc_result(InvalidParams)?;
+            }
+        }
+        let resource_id = self.resource.store_resource_info(param.0).await.to_jsonrpc_result(InternalError)?;
         self.pool.add_task(addr, resource_id).await.to_jsonrpc_result(InternalError)
     }
 
@@ -151,6 +167,8 @@ pub trait GpuServiceRpcClient {
     async fn submit_c2_task(&self, phase1_output: Base64Byte, miner: String, prover_id: ProverId, sector_id: u64)
         -> anyhow::Result<String>;
 
+    async fn add_task(&self, miner: String, task_type: TaskType, param: Base64Byte) -> anyhow::Result<String>;
+
     async fn get_task(&self, id: String) -> anyhow::Result<Task>;
 
     async fn fetch_todo(&self, worker_id_arg: String) -> anyhow::Result<Task>;
@@ -178,6 +196,15 @@ impl GpuServiceRpcClient for WrapClient {
         sector_id: u64,
     ) -> anyhow::Result<String> {
         self.client.submit_c2_task(phase1_output, miner, prover_id, sector_id).await.anyhow()
+    }
+
+    async fn add_task(
+        &self,
+        miner: String,
+        task_type: TaskType,
+        param: Base64Byte
+    ) -> anyhow::Result<String> {
+        self.client.add_task(miner, task_type, param).await.anyhow()
     }
 
     async fn get_task(&self, id: String) -> anyhow::Result<Task> {
