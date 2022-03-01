@@ -79,7 +79,7 @@ impl ProofRpcServer for ProofImpl {
         //check
         match task_type {
             TaskType::C2 => {
-                serde_json::from_slice(&param.0).to_jsonrpc_result(InvalidParams)?;
+                serde_json::from_slice::<resource::C2Resource>(&param.0).to_jsonrpc_result(InvalidParams)?;
             }
         }
         let resource_id = self.resource.store_resource_info(param.0).await.to_jsonrpc_result(InternalError)?;
