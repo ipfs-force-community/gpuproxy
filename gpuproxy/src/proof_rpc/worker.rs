@@ -138,7 +138,7 @@ impl Worker for LocalWorker {
                                                                 seal_commit_phase2(c2.phase1_output, c2.prove_id, c2.sector_id)
                                                         })
                                                     }else{
-                                                       Err(anyhow!("unsupport type of task {} type {}", undo_task.id, undo_task.task_type))
+                                                       Err(anyhow!("unsupport type of task {} type {:?}", undo_task.id, undo_task.task_type))
                                                     };
                                                     futures::executor::block_on(result_tx_clone.send((undo_task, result))).unwrap();
                                                 },
