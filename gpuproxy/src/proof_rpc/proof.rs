@@ -8,20 +8,17 @@ use entity::worker_info as WorkerInfos;
 use ResourceInfos::Model as ResourceInfo;
 use Tasks::Model as Task;
 use WorkerInfos::Model as WorkerInfo;
-
-use jsonrpc_core_client::transports::http;
-use jsonrpc_http_server::jsonrpc_core::IoHandler;
 use jsonrpsee::core::{async_trait, client::Subscription, RpcResult};
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use jsonrpsee::proc_macros::rpc;
-
+use jsonrpsee::types::error::ErrorCode::{InvalidParams, InternalError};
 use crate::resource;
 use crate::utils::base64bytes::Base64Byte;
 use crate::utils::{IntoAnyhow, IntoJsonRpcResult, ReveseOption};
 use anyhow::anyhow;
-use jsonrpc_core::ErrorCode::{InternalError, InvalidParams};
 use jsonrpsee::RpcModule;
 use std::sync::Arc;
+
 
 #[rpc(server, client)]
 pub trait ProofRpc {

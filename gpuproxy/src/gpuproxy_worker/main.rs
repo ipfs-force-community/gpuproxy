@@ -62,7 +62,7 @@ async fn main() {
             let resource_type: String = sub_m.value_of_t("resource-type").unwrap_or_else(|e| e.exit());
             let fs_resource_type: String = sub_m.value_of_t("fs-resource-path").unwrap_or_else(|e| e.exit());
 
-            let cfg = ClientConfig::new(url, db_dsn, max_c2, resource_type, fs_resource_type, log_level);
+            let cfg = WorkerConfig::new(url, db_dsn, max_c2, resource_type, fs_resource_type, log_level);
 
             let lv = LevelFilter::from_str(cfg.log_level.as_str()).unwrap();
             TermLogger::init(lv, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();

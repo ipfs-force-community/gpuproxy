@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use std::fmt::Display;
 use std::pin::Pin;
+use jsonrpsee::types::error::ErrorCode;
 use log::error;
 
 pub mod base64bytes;
@@ -54,14 +55,14 @@ impl<T> IfNotFound<T> for Option<T> {
 }
 
 pub trait IntoJsonRpcResult<T> {
-    fn to_jsonrpc_result(self, code: jsonrpc_core::ErrorCode) -> jsonrpsee::core::RpcResult<T>;
+    fn to_jsonrpc_result(self, code: ErrorCode) -> jsonrpsee::core::RpcResult<T>;
 }
 
 impl<T, E> IntoJsonRpcResult<T> for Result<T, E>
 where
     E: Display,
 {
-    fn to_jsonrpc_result(self, code: jsonrpc_core::ErrorCode) -> jsonrpsee::core::RpcResult<T> {
+    fn to_jsonrpc_result(self, code: ErrorCode) -> jsonrpsee::core::RpcResult<T> {
         self.map_err(|e| jsonrpsee::core::Error::Custom(e.to_string()))
     }
 }

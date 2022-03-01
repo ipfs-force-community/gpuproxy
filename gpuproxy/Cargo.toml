@@ -28,12 +28,15 @@ filecoin-proofs = "11.0.2"
 filecoin-proofs-api = "10.1.0"
 clap = { version = "3.0.4", features = ["derive", "env"] }
 jsonrpsee = { version = "^0.8.0", features = ["full"] }
+jsonrpsee-core = "0.9.0"
+futures-channel = "0.3.21"
+futures-util = "0.3.21"
+hyper = "0.14.17"
+socket2 = "0.4.4"
 
-jsonrpc-core = { version = "18.0.0", features = [] }
-jsonrpc-derive = "18.0.0"
-jsonrpc-http-server = "18.0.0"
-jsonrpc-core-client = {version="18.0.0", features = ["http"]}
-
+globset = "0.4.8"
+lazy_static = "1.4.0"
+unicase = "2.6.0"
 log = { version = "0.4", features = ["std"] }
 simplelog = "*"
 sea-schema = { version = "0.5.1", default-features = false, features = [ "migration", "debug-print" ] }
@@ -51,7 +54,7 @@ base64 = "0.13.0"
 uuid = { version = "0.8", features = ["v4"] }
 defer = "0.1.0"
 scopeguard = "1.1.0"
-tokio = { version = "1.17.0", features = ["full"] }
+tokio = { version = "1.8.0", features = ["full"] }
 futures = "0.3.21"
 
 flate2 = "1.0.22"
@@ -59,6 +62,7 @@ humansize = "1.1.1"
 reqwest = {version = "0.11.9", features = ["blocking", "native-tls-vendored"]}
 pbr = "1.0.4"
 tar = "0.4.38"
+
 
 [dependencies.sea-orm]
 version ="0.6.0"

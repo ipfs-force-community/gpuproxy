@@ -3,6 +3,12 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
 
+/// Used to indicate the state of the current task, the inner type is i32
+/// 0 Undefined old state
+/// 1 Init every new task should be init
+/// 2 Running task has fetched by worker by not completed
+/// 3 Error have error while running this task
+/// 4 Completed task has been calculated
 #[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(i32)]
 #[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr, EnumIter, DeriveActiveEnum)]
@@ -20,6 +26,7 @@ pub enum TaskState {
     Completed = 4,
 }
 
+/// The type of task, only c2 task supported for now
 #[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(i32)]
 #[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr, EnumIter, DeriveActiveEnum)]
@@ -29,6 +36,7 @@ pub enum TaskType {
     C2 = 0,
 }
 
+/// Task Model, Used to save task-related information, such as task status, type, parameters, and results
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[sea_orm(table_name = "tasks")]

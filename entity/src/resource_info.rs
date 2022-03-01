@@ -1,6 +1,7 @@
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
+// Resource Model, Every task needs to be calculated with a resource, and table is specially used to save the content of computing parameters
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[sea_orm(table_name = "resource_infos")]
