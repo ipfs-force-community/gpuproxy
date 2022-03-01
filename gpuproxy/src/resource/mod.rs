@@ -61,3 +61,22 @@ impl Resource for FileResource {
         Ok(resource_id)
     }
 }
+
+#[test]
+pub fn test_de() {
+    let test_str = include_str!("./c2proxy_base64");
+
+    use super::*;
+
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    pub struct C2Input {
+        pub c1out: SealCommitPhase1Output,
+        pub prover_id: ProverId,
+        pub sector_id: SectorId,
+        pub miner_id: u64,
+    }
+
+
+    let c2_input_json = base64::decode(test_str).unwrap();
+    serde_json::from_slice::<C2Resource>(&c2_input_json).unwrap();
+}

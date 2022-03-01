@@ -38,6 +38,3 @@ pub mod middleware;
 pub use jsonrpsee::core::server::rpc_module::RpcModule;
 pub use jsonrpsee::types as types;
 pub use server::{Builder as HttpServerBuilder, Server as HttpServer, ServerHandle as HttpServerHandle};
-
-#[cfg(test)]
-mod tests;
