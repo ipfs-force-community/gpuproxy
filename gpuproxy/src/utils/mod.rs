@@ -4,7 +4,8 @@ use log::error;
 use std::fmt::Display;
 use std::pin::Pin;
 
-pub mod base64bytes;
+mod base64bytes;
+pub use base64bytes::Base64Byte;
 
 pub trait IntoAnyhow<T> {
     fn anyhow(self) -> anyhow::Result<T>;

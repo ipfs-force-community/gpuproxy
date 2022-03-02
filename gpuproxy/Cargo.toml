@@ -1,6 +1,7 @@
 [package]
 name = "gpuproxy"
 version = "0.1.0"
+authors = ["hunjixin"]
 edition = "2021"
 
 
@@ -25,7 +26,7 @@ migration = { path = "../migration" }
 async-trait = "0.1.52"
 storage-proofs-core = "11.0.2"
 filecoin-proofs = "11.0.2"
-filecoin-proofs-api = "8.0"
+filecoin-proofs-api = "11.0.0"
 clap = { version = "3.0.4", features = ["derive", "env"] }
 jsonrpsee = { version = "^0.8.0", features = ["full"] }
 jsonrpsee-core = "0.9.0"

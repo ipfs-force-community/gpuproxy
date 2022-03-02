@@ -3,7 +3,7 @@ use filecoin_proofs_api::{ProverId, SectorId};
 use std::str::FromStr;
 
 use crate::resource;
-use crate::utils::base64bytes::Base64Byte;
+use crate::utils::Base64Byte;
 use crate::utils::{IntoAnyhow, IntoJsonRpcResult, ReveseOption};
 use anyhow::anyhow;
 use bytes::BufMut;

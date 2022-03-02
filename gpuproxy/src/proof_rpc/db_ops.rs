@@ -9,7 +9,7 @@ use Tasks::Model as Task;
 use WorkerInfos::Model as WorkerInfo;
 
 use crate::resource::Resource;
-use crate::utils::base64bytes::Base64Byte;
+use crate::utils::Base64Byte;
 use crate::utils::*;
 use anyhow::{anyhow, Result};
 use chrono::Utc;
