@@ -1,5 +1,5 @@
 use clap::{Arg, ArgMatches, Command};
-use gpuproxy::params_fetch;
+use crate::params_fetch;
 
 pub async fn fetch_params_cmds<'a>() -> Command<'a> {
     Command::new("paramfetch")

@@ -1,9 +1,11 @@
 use crate::db_ops::*;
 use crate::worker::Worker;
+
+use gpuproxy::cli;
 use clap::{Arg, Command};
 use gpuproxy::config::*;
 use gpuproxy::proof_rpc::*;
-use gpuproxy::resource;
+use gpuproxy::{resource};
 use log::*;
 use sea_orm::Database;
 use simplelog::*;
@@ -14,6 +16,8 @@ use migration::{Migrator, MigratorTrait};
 
 #[tokio::main]
 async fn main() {
+
+    let worker_args = cli::worker::get_worker_arg();
     let app_m = Command::new("gpuproxy-worker")
         .version("0.0.1")
         .arg_required_else_help(true)
@@ -49,12 +53,14 @@ async fn main() {
                     .env("./tar")
                     .default_value("")
                     .help("when resource type is fs, will use this path to read resource"),
-            ]),
+            ]).args(worker_args),
         )
         .get_matches();
 
     match app_m.subcommand() {
         Some(("run", ref sub_m)) => {
+            cli::worker::set_worker_env(sub_m);
+
             let url: String = sub_m.value_of_t("gpuproxy-url").unwrap_or_else(|e| e.exit());
             let max_c2: usize = sub_m.value_of_t("max-c2").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());

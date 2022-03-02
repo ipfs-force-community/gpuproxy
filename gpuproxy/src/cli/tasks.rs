@@ -1,5 +1,5 @@
 use clap::{Arg, ArgMatches, Command};
-use gpuproxy::proof_rpc::proof::{get_proxy_api, GpuServiceRpcClient};
+use crate::proof_rpc::proof::{get_proxy_api, GpuServiceRpcClient};
 
 pub async fn list_task_cmds<'a>() -> Command<'a> {
     Command::new("tasks")
@@ -13,8 +13,8 @@ pub async fn list_task_cmds<'a>() -> Command<'a> {
             .required(false)
             .help("specify url for provide service api service")])
         .subcommand(Command::new("list").about("list task status").args(&[
-                                // Arg::new("")
-                        ]))
+            // Arg::new("")
+        ]))
 }
 pub async fn tasks_command(task_m: &&ArgMatches) {
     match task_m.subcommand() {

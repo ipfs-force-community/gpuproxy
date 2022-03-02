@@ -1,6 +1,3 @@
-mod cli;
-mod params_fetch_cli;
-
 use crate::db_ops::*;
 use crate::worker::Worker;
 use clap::{Arg, Command};
@@ -16,6 +13,7 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use gpuproxy::cli;
 
 use migration::{Migrator, MigratorTrait};
 
@@ -24,8 +22,9 @@ async fn main() {
     let lv = LevelFilter::from_str("trace").unwrap();
     TermLogger::init(lv, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
 
-    let list_task_cmds = cli::list_task_cmds().await;
-    let fetch_params_cmds = params_fetch_cli::fetch_params_cmds().await;
+    let worker_args = cli::worker::get_worker_arg();
+    let list_task_cmds = cli::tasks::list_task_cmds().await;
+    let fetch_params_cmds = cli::params_fetch_cli::fetch_params_cmds().await;
     let app_m = Command::new("gpuproxy")
         .version("0.0.1")
         .arg_required_else_help(true)
@@ -68,7 +67,7 @@ async fn main() {
                     .env("C2PROXY_FS_RESOURCE_PATH")
                     .default_value("")
                     .help("when resource type is fs, will use this path to read resource"),
-            ]),
+            ]).args(worker_args),
         )
         .subcommand(list_task_cmds)
         .subcommand(fetch_params_cmds)
@@ -76,7 +75,8 @@ async fn main() {
 
     match app_m.subcommand() {
         Some(("run", ref sub_m)) => {
-            std::env::set_var("BELLMAN_NO_GPU", "1");
+            cli::worker::set_worker_env(sub_m);
+
             let url: String = sub_m.value_of_t("url").unwrap_or_else(|e| e.exit());
             let max_c2: usize = sub_m.value_of_t("max-c2").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
@@ -89,8 +89,8 @@ async fn main() {
 
             run_cfg(cfg).await;
         } // run was used
-        Some(("tasks", ref sub_m)) => cli::tasks_command(sub_m).await, // task was used
-        Some(("paramfetch", ref sub_m)) => params_fetch_cli::fetch_params_command(sub_m).await, // run was used
+        Some(("tasks", ref sub_m)) => cli::tasks::tasks_command(sub_m).await, // task was used
+        Some(("paramfetch", ref sub_m)) => cli::params_fetch_cli::fetch_params_command(sub_m).await, // run was used
         _ => {}                                                        // Either no subcommand or one not tested for...
     }
 }

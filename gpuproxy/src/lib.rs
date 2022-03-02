@@ -12,3 +12,4 @@ pub mod resource;
 pub mod utils;
 pub mod params_fetch;
 pub mod http_server;
+pub mod cli;
