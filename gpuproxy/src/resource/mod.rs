@@ -22,7 +22,7 @@ pub struct C2Resource {
 #[async_trait]
 pub trait Resource {
     async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte>;
-    async fn store_resource_info(&self, resource: Vec<u8>) -> Result<String>;
+    async fn store_resource_info(&self, resource_id: String, resource: Vec<u8>) -> Result<String>;
 }
 
 pub struct FileResource {
@@ -54,8 +54,7 @@ impl Resource for FileResource {
         Ok(Base64Byte::new(buffer))
     }
 
-    async fn store_resource_info(&self, resource: Vec<u8>) -> Result<String> {
-        let resource_id = Uuid::new_v4().to_string();
+    async fn store_resource_info(&self, resource_id: String, resource: Vec<u8>) -> Result<String> {
         let new_path = Path::new(self.root.as_str()).join(resource_id.clone());
         fs::write(new_path, resource)?;
         Ok(resource_id)

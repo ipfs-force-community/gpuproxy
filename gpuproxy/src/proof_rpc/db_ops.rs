@@ -40,7 +40,7 @@ pub trait WorkerFetch {
 
 #[async_trait]
 pub trait Common {
-    async fn add_task(&self, miner_arg: forest_address::Address, resource_id: String) -> Result<String>;
+    async fn add_task(&self, task_id: String, miner_arg: forest_address::Address, task_type: TaskType, resource_id: String) -> Result<String>;
     async fn fetch(&self, tid: String) -> Result<Task>;
     async fn fetch_undo(&self) -> Result<Vec<Task>>;
     async fn get_status(&self, tid: String) -> Result<TaskState>;
@@ -139,15 +139,14 @@ impl WorkerFetch for DbOpsImpl {
 
 #[async_trait]
 impl Common for DbOpsImpl {
-    async fn add_task(&self, miner_arg: forest_address::Address, resource_id: String) -> Result<String> {
+    async fn add_task(&self, task_id: String, miner_arg: forest_address::Address, task_type: TaskType, resource_id: String) -> Result<String> {
         let miner_noprefix = &miner_arg.to_string()[1..];
-        let new_task_id = Uuid::new_v4().to_string();
         let new_task = Tasks::ActiveModel {
-            id: Set(new_task_id.clone()),
+            id: Set(task_id.clone()),
             miner: Set(miner_noprefix.to_string()),
             resource_id: Set(resource_id.clone()),
             worker_id: Set("".to_string()),
-            task_type: Set(TaskType::C2),
+            task_type: Set(task_type),
             state: Set(TaskState::Init),
             create_at: Set(Utc::now().timestamp()),
             proof: Set("".to_string()),
@@ -155,7 +154,8 @@ impl Common for DbOpsImpl {
             start_at: Set(0),
             complete_at: Set(0),
         };
-        new_task.insert(&self.conn).await.anyhow().and(Ok(new_task_id))
+
+        new_task.insert(&self.conn).await.anyhow().and(Ok(task_id))
     }
 
     async fn fetch(&self, tid: String) -> Result<Task> {
@@ -221,8 +221,7 @@ impl Resource for DbOpsImpl {
         xx
     }
 
-    async fn store_resource_info(&self, resource: Vec<u8>) -> Result<String> {
-        let resource_id = Uuid::new_v4().to_string();
+    async fn store_resource_info(&self, resource_id: String, resource: Vec<u8>) -> Result<String> {
         let resource_info = ResourceInfos::ActiveModel {
             id: Set(resource_id.clone()),
             data: Set(resource),

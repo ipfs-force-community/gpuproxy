@@ -19,7 +19,8 @@ use crate::utils::{IntoAnyhow, IntoJsonRpcResult, ReveseOption};
 use anyhow::anyhow;
 use jsonrpsee::RpcModule;
 use std::sync::Arc;
-
+use bytes::BufMut;
+use uuid::Uuid;
 
 #[rpc(server, client)]
 pub trait ProofRpc {
@@ -70,8 +71,15 @@ impl ProofRpcServer for ProofImpl {
             c1out: scp1o,
         };
         let resource_bytes = serde_json::to_vec(&c2_resurce).to_jsonrpc_result(InternalError)?;
-        let resource_id = self.resource.store_resource_info(resource_bytes).await.to_jsonrpc_result(InternalError)?;
-        self.pool.add_task(addr, resource_id).await.to_jsonrpc_result(InternalError)
+        let resource_id = Uuid::new_v5(&Uuid::NAMESPACE_OID, &resource_bytes).to_string();
+        let _ = self.resource.store_resource_info(resource_id.clone() , resource_bytes).await.to_jsonrpc_result(InternalError)?;
+
+        let mut buf = bytes::BytesMut::new();
+        buf.put_slice(&addr.payload_bytes());
+        buf.put_i32(TaskType::C2.into());
+        buf.put_slice(resource_id.clone().as_bytes());
+        let task_id = Uuid::new_v5(&Uuid::NAMESPACE_OID, buf.as_ref()).to_string();
+        self.pool.add_task(task_id, addr, TaskType::C2, resource_id).await.to_jsonrpc_result(InternalError)
     }
 
     async fn add_task(&self, miner: String, task_type: TaskType, param: Base64Byte) -> RpcResult<String> {
@@ -82,8 +90,16 @@ impl ProofRpcServer for ProofImpl {
                 serde_json::from_slice::<resource::C2Resource>(&param.0).to_jsonrpc_result(InvalidParams)?;
             }
         }
-        let resource_id = self.resource.store_resource_info(param.0).await.to_jsonrpc_result(InternalError)?;
-        self.pool.add_task(addr, resource_id).await.to_jsonrpc_result(InternalError)
+
+        let resource_id = uuid::Uuid::new_v5(   &Uuid::NAMESPACE_OID, &param.0).to_string();
+        let _ = self.resource.store_resource_info(resource_id.clone(), param.0).await.to_jsonrpc_result(InternalError)?;
+
+        let mut buf = bytes::BytesMut::new();
+        buf.put_slice(&addr.payload_bytes());
+        buf.put_i32(TaskType::C2.into());
+        buf.put_slice(resource_id.clone().as_bytes());
+        let task_id = Uuid::new_v5(&Uuid::NAMESPACE_OID, buf.as_ref()).to_string();
+        self.pool.add_task(task_id, addr, TaskType::C2, resource_id).await.to_jsonrpc_result(InternalError)
     }
 
     async fn get_task(&self, id: String) -> RpcResult<Task> {
@@ -138,7 +154,7 @@ impl resource::Resource for WrapClient {
         self.client.get_resource_info(resource_id_arg).await.anyhow()
     }
 
-    async fn store_resource_info(&self, _: Vec<u8>) -> anyhow::Result<String> {
+    async fn store_resource_info(&self, _: String,  _: Vec<u8>) -> anyhow::Result<String> {
         Err(anyhow!("not support set resource in worker"))
     }
 }
