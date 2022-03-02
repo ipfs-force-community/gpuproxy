@@ -21,6 +21,7 @@ pub struct C2Resource {
 
 #[async_trait]
 pub trait Resource {
+    async fn has_resource(&self, resource_id: String) -> Result<bool>;
     async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte>;
     async fn store_resource_info(&self, resource_id: String, resource: Vec<u8>) -> Result<String>;
 }
@@ -40,6 +41,11 @@ unsafe impl Sync for FileResource {}
 
 #[async_trait]
 impl Resource for FileResource {
+    async fn has_resource(&self, resource_id: String) -> Result<bool> {
+        let new_path = Path::new(self.root.as_str()).join(resource_id.clone());
+        Ok(new_path.is_file())
+    }
+
     async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
         let new_path = Path::new(self.root.as_str()).join(resource_id.clone());
         let filename = new_path.to_str().ok_or(anyhow!(
@@ -74,7 +80,6 @@ pub fn test_de() {
         pub sector_id: SectorId,
         pub miner_id: u64,
     }
-
 
     let c2_input_json = base64::decode(test_str).unwrap();
     serde_json::from_slice::<C2Resource>(&c2_input_json).unwrap();

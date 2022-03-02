@@ -6,10 +6,10 @@
 #[macro_use(defer)]
 extern crate scopeguard;
 
+pub mod cli;
 pub mod config;
+pub mod http_server;
+pub mod params_fetch;
 pub mod proof_rpc;
 pub mod resource;
 pub mod utils;
-pub mod params_fetch;
-pub mod http_server;
-pub mod cli;

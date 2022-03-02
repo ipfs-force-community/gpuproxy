@@ -1,8 +1,8 @@
 use anyhow::anyhow;
-use std::fmt::Display;
-use std::pin::Pin;
 use jsonrpsee::types::error::ErrorCode;
 use log::error;
+use std::fmt::Display;
+use std::pin::Pin;
 
 pub mod base64bytes;
 
@@ -68,18 +68,17 @@ where
 }
 
 pub trait LogErr {
-    fn log_error(self) ;
+    fn log_error(self);
 }
 
 impl<T, E> LogErr for Result<T, E>
-    where
-        E: Display,
+where
+    E: Display,
 {
     fn log_error(self) {
         match self {
             Err(e) => error!("{}", e.to_string()),
             _ => {}
         }
-
     }
 }

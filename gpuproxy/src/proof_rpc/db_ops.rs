@@ -40,7 +40,14 @@ pub trait WorkerFetch {
 
 #[async_trait]
 pub trait Common {
-    async fn add_task(&self, task_id: String, miner_arg: forest_address::Address, task_type: TaskType, resource_id: String) -> Result<String>;
+    async fn add_task(
+        &self,
+        task_id: String,
+        miner_arg: forest_address::Address,
+        task_type: TaskType,
+        resource_id: String,
+    ) -> Result<String>;
+    async fn has_task(&self, task_id: String) -> Result<bool>;
     async fn fetch(&self, tid: String) -> Result<Task>;
     async fn fetch_undo(&self) -> Result<Vec<Task>>;
     async fn get_status(&self, tid: String) -> Result<TaskState>;
@@ -139,7 +146,13 @@ impl WorkerFetch for DbOpsImpl {
 
 #[async_trait]
 impl Common for DbOpsImpl {
-    async fn add_task(&self, task_id: String, miner_arg: forest_address::Address, task_type: TaskType, resource_id: String) -> Result<String> {
+    async fn add_task(
+        &self,
+        task_id: String,
+        miner_arg: forest_address::Address,
+        task_type: TaskType,
+        resource_id: String,
+    ) -> Result<String> {
         let miner_noprefix = &miner_arg.to_string()[1..];
         let new_task = Tasks::ActiveModel {
             id: Set(task_id.clone()),
@@ -156,6 +169,16 @@ impl Common for DbOpsImpl {
         };
 
         new_task.insert(&self.conn).await.anyhow().and(Ok(task_id))
+    }
+
+    async fn has_task(&self, task_id: String) -> Result<bool> {
+        Tasks::Entity::find()
+            .select_only()
+            .filter(Tasks::Column::Id.eq(task_id.clone()))
+            .count(&self.conn)
+            .await
+            .map(|count| count > 0)
+            .anyhow()
     }
 
     async fn fetch(&self, tid: String) -> Result<Task> {
@@ -210,15 +233,24 @@ impl Common for DbOpsImpl {
 
 #[async_trait]
 impl Resource for DbOpsImpl {
+    async fn has_resource(&self, resource_id: String) -> Result<bool> {
+        ResourceInfos::Entity::find()
+            .select_only()
+            .filter(ResourceInfos::Column::Id.eq(resource_id))
+            .count(&self.conn)
+            .await
+            .map(|count| count > 0)
+            .anyhow()
+    }
+
     async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
-        let xx = ResourceInfos::Entity::find()
+        ResourceInfos::Entity::find()
             .filter(ResourceInfos::Column::Id.eq(resource_id))
             .one(&self.conn)
             .await?
             .if_not_found()
             .map(|val: ResourceInfo| Base64Byte::new(val.data))
-            .anyhow();
-        xx
+            .anyhow()
     }
 
     async fn store_resource_info(&self, resource_id: String, resource: Vec<u8>) -> Result<String> {

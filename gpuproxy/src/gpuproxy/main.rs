@@ -1,6 +1,7 @@
 use crate::db_ops::*;
 use crate::worker::Worker;
 use clap::{Arg, Command};
+use gpuproxy::cli;
 use gpuproxy::config::*;
 use gpuproxy::proof_rpc::proof::ProofImpl;
 use gpuproxy::proof_rpc::*;
@@ -13,7 +14,6 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use gpuproxy::cli;
 
 use migration::{Migrator, MigratorTrait};
 
@@ -29,45 +29,48 @@ async fn main() {
         .version("0.0.1")
         .arg_required_else_help(true)
         .subcommand(
-            Command::new("run").about("run daemon for provide service").args(&[
-                Arg::new("url")
-                    .long("url")
-                    .env("C2PROXY_URL")
-                    .default_value("127.0.0.1:8888")
-                    .help("specify url for provide service api service"),
-                Arg::new("db-dsn")
-                    .long("db-dsn")
-                    .env("C2PROXY_DSN")
-                    .default_value("sqlite://gpuproxy.db")
-                    .help("specify sqlite path to store task"),
-                Arg::new("max-c2")
-                    .long("max-c2")
-                    .env("C2PROXY_MAX_C2")
-                    .default_value("1")
-                    .help("number of c2 task to run parallelly"),
-                Arg::new("disable-worker")
-                    .long("disable-worker")
-                    .env("C2PROXY_DISABLE_WORKER")
-                    .required(false)
-                    .takes_value(false)
-                    .default_value("false")
-                    .help("disable worker on gpuproxy manager"),
-                Arg::new("log-level")
-                    .long("log-level")
-                    .env("C2PROXY_LOG_LEVEL")
-                    .default_value("info")
-                    .help("set log level for application"),
-                Arg::new("resource-type")
-                    .long("resource-type")
-                    .env("C2PROXY_RESOURCE_TYPE")
-                    .default_value("db")
-                    .help("resource type(db, fs)"),
-                Arg::new("fs-resource-path")
-                    .long("fs-resource-path")
-                    .env("C2PROXY_FS_RESOURCE_PATH")
-                    .default_value("")
-                    .help("when resource type is fs, will use this path to read resource"),
-            ]).args(worker_args),
+            Command::new("run")
+                .about("run daemon for provide service")
+                .args(&[
+                    Arg::new("url")
+                        .long("url")
+                        .env("C2PROXY_URL")
+                        .default_value("127.0.0.1:8888")
+                        .help("specify url for provide service api service"),
+                    Arg::new("db-dsn")
+                        .long("db-dsn")
+                        .env("C2PROXY_DSN")
+                        .default_value("sqlite://gpuproxy.db")
+                        .help("specify sqlite path to store task"),
+                    Arg::new("max-c2")
+                        .long("max-c2")
+                        .env("C2PROXY_MAX_C2")
+                        .default_value("1")
+                        .help("number of c2 task to run parallelly"),
+                    Arg::new("disable-worker")
+                        .long("disable-worker")
+                        .env("C2PROXY_DISABLE_WORKER")
+                        .required(false)
+                        .takes_value(false)
+                        .default_value("false")
+                        .help("disable worker on gpuproxy manager"),
+                    Arg::new("log-level")
+                        .long("log-level")
+                        .env("C2PROXY_LOG_LEVEL")
+                        .default_value("info")
+                        .help("set log level for application"),
+                    Arg::new("resource-type")
+                        .long("resource-type")
+                        .env("C2PROXY_RESOURCE_TYPE")
+                        .default_value("db")
+                        .help("resource type(db, fs)"),
+                    Arg::new("fs-resource-path")
+                        .long("fs-resource-path")
+                        .env("C2PROXY_FS_RESOURCE_PATH")
+                        .default_value("")
+                        .help("when resource type is fs, will use this path to read resource"),
+                ])
+                .args(worker_args),
         )
         .subcommand(list_task_cmds)
         .subcommand(fetch_params_cmds)
@@ -91,7 +94,7 @@ async fn main() {
         } // run was used
         Some(("tasks", ref sub_m)) => cli::tasks::tasks_command(sub_m).await, // task was used
         Some(("paramfetch", ref sub_m)) => cli::params_fetch_cli::fetch_params_command(sub_m).await, // run was used
-        _ => {}                                                        // Either no subcommand or one not tested for...
+        _ => {}                                                               // Either no subcommand or one not tested for...
     }
 }
 

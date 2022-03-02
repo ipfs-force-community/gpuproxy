@@ -1,11 +1,11 @@
 use crate::db_ops::*;
 use crate::worker::Worker;
 
-use gpuproxy::cli;
 use clap::{Arg, Command};
+use gpuproxy::cli;
 use gpuproxy::config::*;
 use gpuproxy::proof_rpc::*;
-use gpuproxy::{resource};
+use gpuproxy::resource;
 use log::*;
 use sea_orm::Database;
 use simplelog::*;
@@ -16,44 +16,46 @@ use migration::{Migrator, MigratorTrait};
 
 #[tokio::main]
 async fn main() {
-
     let worker_args = cli::worker::get_worker_arg();
     let app_m = Command::new("gpuproxy-worker")
         .version("0.0.1")
         .arg_required_else_help(true)
         .subcommand(
-            Command::new("run").about("worker for execute task").args(&[
-                Arg::new("gpuproxy-url")
-                    .long("gpuproxy-url")
-                    .env("C2PROXY_LISTEN_URL")
-                    .default_value("http://127.0.0.1:8888")
-                    .help("specify url for connect gpuproxy for get task to excute"),
-                Arg::new("db-dsn")
-                    .long("db-dsn")
-                    .env("C2PROXY_DSN")
-                    .default_value("sqlite://gpuproxy-worker.db")
-                    .help("specify sqlite path to store task"),
-                Arg::new("max-c2")
-                    .long("max-c2")
-                    .env("C2PROXY_MAX_C2")
-                    .default_value("1")
-                    .help("number of c2 task to run parallelly"),
-                Arg::new("log-level")
-                    .long("log-level")
-                    .env("C2PROXY_LOG_LEVEL")
-                    .default_value("info")
-                    .help("set log level for application"),
-                Arg::new("resource-type")
-                    .long("resource-type")
-                    .env("C2PROXY_RESOURCE_TYPE")
-                    .default_value("db")
-                    .help("resource type(db, fs)"),
-                Arg::new("fs-resource-path")
-                    .long("fs-resource-path")
-                    .env("./tar")
-                    .default_value("")
-                    .help("when resource type is fs, will use this path to read resource"),
-            ]).args(worker_args),
+            Command::new("run")
+                .about("worker for execute task")
+                .args(&[
+                    Arg::new("gpuproxy-url")
+                        .long("gpuproxy-url")
+                        .env("C2PROXY_LISTEN_URL")
+                        .default_value("http://127.0.0.1:8888")
+                        .help("specify url for connect gpuproxy for get task to excute"),
+                    Arg::new("db-dsn")
+                        .long("db-dsn")
+                        .env("C2PROXY_DSN")
+                        .default_value("sqlite://gpuproxy-worker.db")
+                        .help("specify sqlite path to store task"),
+                    Arg::new("max-c2")
+                        .long("max-c2")
+                        .env("C2PROXY_MAX_C2")
+                        .default_value("1")
+                        .help("number of c2 task to run parallelly"),
+                    Arg::new("log-level")
+                        .long("log-level")
+                        .env("C2PROXY_LOG_LEVEL")
+                        .default_value("info")
+                        .help("set log level for application"),
+                    Arg::new("resource-type")
+                        .long("resource-type")
+                        .env("C2PROXY_RESOURCE_TYPE")
+                        .default_value("db")
+                        .help("resource type(db, fs)"),
+                    Arg::new("fs-resource-path")
+                        .long("fs-resource-path")
+                        .env("./tar")
+                        .default_value("")
+                        .help("when resource type is fs, will use this path to read resource"),
+                ])
+                .args(worker_args),
         )
         .get_matches();
 

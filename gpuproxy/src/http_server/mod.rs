@@ -32,9 +32,9 @@
 
 mod server;
 
+pub mod middleware;
 /// Common builders for RPC responses.
 pub mod response;
-pub mod middleware;
 pub use jsonrpsee::core::server::rpc_module::RpcModule;
-pub use jsonrpsee::types as types;
+pub use jsonrpsee::types;
 pub use server::{Builder as HttpServerBuilder, Server as HttpServer, ServerHandle as HttpServerHandle};

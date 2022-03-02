@@ -1,5 +1,5 @@
-use clap::{Arg, ArgMatches, Command};
 use crate::proof_rpc::proof::{get_proxy_api, GpuServiceRpcClient};
+use clap::{Arg, ArgMatches, Command};
 
 pub async fn list_task_cmds<'a>() -> Command<'a> {
     Command::new("tasks")

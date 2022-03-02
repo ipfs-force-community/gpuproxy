@@ -2,25 +2,25 @@ use crate::proof_rpc::db_ops::*;
 use filecoin_proofs_api::{ProverId, SectorId};
 use std::str::FromStr;
 
-use entity::tasks::TaskType;
-use entity::resource_info as ResourceInfos;
-use entity::tasks as Tasks;
-use entity::worker_info as WorkerInfos;
-use ResourceInfos::Model as ResourceInfo;
-use Tasks::Model as Task;
-use WorkerInfos::Model as WorkerInfo;
-use jsonrpsee::core::{async_trait, client::Subscription, RpcResult};
-use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
-use jsonrpsee::proc_macros::rpc;
-use jsonrpsee::types::error::ErrorCode::{InvalidParams, InternalError};
 use crate::resource;
 use crate::utils::base64bytes::Base64Byte;
 use crate::utils::{IntoAnyhow, IntoJsonRpcResult, ReveseOption};
 use anyhow::anyhow;
+use bytes::BufMut;
+use entity::resource_info as ResourceInfos;
+use entity::tasks as Tasks;
+use entity::tasks::TaskType;
+use entity::worker_info as WorkerInfos;
+use jsonrpsee::core::{async_trait, client::Subscription, RpcResult};
+use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
+use jsonrpsee::proc_macros::rpc;
+use jsonrpsee::types::error::ErrorCode::{InternalError, InvalidParams};
 use jsonrpsee::RpcModule;
 use std::sync::Arc;
-use bytes::BufMut;
 use uuid::Uuid;
+use ResourceInfos::Model as ResourceInfo;
+use Tasks::Model as Task;
+use WorkerInfos::Model as WorkerInfo;
 
 #[rpc(server, client)]
 pub trait ProofRpc {
@@ -72,14 +72,28 @@ impl ProofRpcServer for ProofImpl {
         };
         let resource_bytes = serde_json::to_vec(&c2_resurce).to_jsonrpc_result(InternalError)?;
         let resource_id = Uuid::new_v5(&Uuid::NAMESPACE_OID, &resource_bytes).to_string();
-        let _ = self.resource.store_resource_info(resource_id.clone() , resource_bytes).await.to_jsonrpc_result(InternalError)?;
+        if !self.resource.has_resource(resource_id.clone()).await? {
+            let _ = self
+                .resource
+                .store_resource_info(resource_id.clone(), resource_bytes)
+                .await
+                .to_jsonrpc_result(InternalError)?;
+        }
 
         let mut buf = bytes::BytesMut::new();
         buf.put_slice(&addr.payload_bytes());
         buf.put_i32(TaskType::C2.into());
         buf.put_slice(resource_id.clone().as_bytes());
         let task_id = Uuid::new_v5(&Uuid::NAMESPACE_OID, buf.as_ref()).to_string();
-        self.pool.add_task(task_id, addr, TaskType::C2, resource_id).await.to_jsonrpc_result(InternalError)
+
+        if !self.pool.has_task(task_id.clone()).await? {
+            self.pool
+                .clone()
+                .add_task(task_id.clone(), addr, TaskType::C2, resource_id)
+                .await
+                .to_jsonrpc_result(InternalError)?;
+        }
+        Ok(task_id)
     }
 
     async fn add_task(&self, miner: String, task_type: TaskType, param: Base64Byte) -> RpcResult<String> {
@@ -91,8 +105,12 @@ impl ProofRpcServer for ProofImpl {
             }
         }
 
-        let resource_id = uuid::Uuid::new_v5(   &Uuid::NAMESPACE_OID, &param.0).to_string();
-        let _ = self.resource.store_resource_info(resource_id.clone(), param.0).await.to_jsonrpc_result(InternalError)?;
+        let resource_id = uuid::Uuid::new_v5(&Uuid::NAMESPACE_OID, &param.0).to_string();
+        let _ = self
+            .resource
+            .store_resource_info(resource_id.clone(), param.0)
+            .await
+            .to_jsonrpc_result(InternalError)?;
 
         let mut buf = bytes::BytesMut::new();
         buf.put_slice(&addr.payload_bytes());
@@ -150,11 +168,15 @@ pub struct WrapClient {
 
 #[async_trait]
 impl resource::Resource for WrapClient {
+    async fn has_resource(&self, resource_id: String) -> anyhow::Result<bool> {
+        Err(anyhow!("not support set resource in worker"))
+    }
+
     async fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Base64Byte> {
         self.client.get_resource_info(resource_id_arg).await.anyhow()
     }
 
-    async fn store_resource_info(&self, _: String,  _: Vec<u8>) -> anyhow::Result<String> {
+    async fn store_resource_info(&self, _: String, _: Vec<u8>) -> anyhow::Result<String> {
         Err(anyhow!("not support set resource in worker"))
     }
 }
@@ -214,12 +236,7 @@ impl GpuServiceRpcClient for WrapClient {
         self.client.submit_c2_task(phase1_output, miner, prover_id, sector_id).await.anyhow()
     }
 
-    async fn add_task(
-        &self,
-        miner: String,
-        task_type: TaskType,
-        param: Base64Byte
-    ) -> anyhow::Result<String> {
+    async fn add_task(&self, miner: String, task_type: TaskType, param: Base64Byte) -> anyhow::Result<String> {
         self.client.add_task(miner, task_type, param).await.anyhow()
     }
 

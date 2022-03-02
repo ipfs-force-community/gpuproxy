@@ -9,6 +9,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::sync::oneshot;
 
+use crate::utils::*;
 use async_trait::async_trait;
 use entity::resource_info as ResourceInfos;
 use entity::tasks as Tasks;
@@ -18,7 +19,6 @@ use tokio::time::{sleep, Duration};
 use ResourceInfos::Model as ResourceInfo;
 use Tasks::Model as Task;
 use WorkerInfos::Model as WorkerInfo;
-use crate::utils::*;
 
 #[async_trait]
 pub trait Worker {
@@ -72,25 +72,25 @@ impl Worker for LocalWorker {
                             continue;
                         }
 
-                        let select_task:Task;
+                        let select_task: Task;
                         if un_complete_task_result.len() > 0 {
                             select_task = un_complete_task_result.pop().unwrap();
-                        }else{
+                        } else {
                             match fetcher.fetch_one_todo(worker_id.clone()).await {
                                 Ok(v) => {
-                                    select_task  = v;
+                                    select_task = v;
                                 }
                                 Err(e) => {
                                     error!("unable to get task {}", e);
                                     continue;
-                                },
+                                }
                             }
                         }
 
                         let task_id = select_task.id.clone();
                         if let Err(e) = tx.send(select_task).await {
                             error!("unable to send task to channel {:?}", e);
-                        }else{
+                        } else {
                             debug!("send new task {} to channel", task_id);
                             count_clone.fetch_add(1, Ordering::SeqCst);
                         }

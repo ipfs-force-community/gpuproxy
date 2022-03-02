@@ -1,16 +1,13 @@
 use crate::proof_rpc::proof::{get_proxy_api, GpuServiceRpcClient};
 use clap::{Arg, ArgMatches, Command};
 
-
-
 pub fn get_worker_arg<'a>() -> Vec<Arg<'a>> {
-    [
-        Arg::new("no-gpu")
-            .long("no-gpu")
-            .env("C2PROXY_NO_GPU")
-            .default_value("false")
-            .help("disable worker on gpuproxy manager"),
-    ].to_vec()
+    [Arg::new("no-gpu")
+        .long("no-gpu")
+        .env("C2PROXY_NO_GPU")
+        .default_value("false")
+        .help("disable worker on gpuproxy manager")]
+    .to_vec()
 }
 
 pub fn set_worker_env(sub_m: &&ArgMatches) {
