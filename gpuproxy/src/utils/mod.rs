@@ -7,6 +7,7 @@ use std::pin::Pin;
 mod base64bytes;
 pub use base64bytes::Base64Byte;
 
+/// convert any std result to anyhow result
 pub trait IntoAnyhow<T> {
     fn anyhow(self) -> anyhow::Result<T>;
 }
@@ -20,6 +21,7 @@ where
     }
 }
 
+/// Convert Option<Error> => Result<bool>
 pub trait ReveseOption {
     fn reverse_map_err(self) -> jsonrpsee::core::RpcResult<bool>;
 }
@@ -42,10 +44,12 @@ where
     }
 }
 
+/// this trait used in db ops, when query return Option<T>, convert to Result<T> while Some, convert to Err("not found") for None value
 pub trait IfNotFound<T> {
     fn if_not_found(self) -> anyhow::Result<T>;
 }
 
+/// convert Option<T> to Result<T>
 impl<T> IfNotFound<T> for Option<T> {
     fn if_not_found(self) -> anyhow::Result<T> {
         match self {
@@ -55,6 +59,7 @@ impl<T> IfNotFound<T> for Option<T> {
     }
 }
 
+/// convert std result to jsonrpsee result
 pub trait IntoJsonRpcResult<T> {
     fn to_jsonrpc_result(self, code: ErrorCode) -> jsonrpsee::core::RpcResult<T>;
 }
@@ -68,6 +73,7 @@ where
     }
 }
 
+/// use to log error message and ignore the val while Ok
 pub trait LogErr {
     fn log_error(self);
 }

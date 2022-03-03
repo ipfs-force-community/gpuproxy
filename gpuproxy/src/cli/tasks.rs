@@ -1,17 +1,10 @@
-use crate::proof_rpc::proof::{get_proxy_api, GpuServiceRpcClient};
+use crate::proxy_rpc::rpc::{get_proxy_api, GpuServiceRpcClient};
 use clap::{Arg, ArgMatches, Command};
 
 pub async fn list_task_cmds<'a>() -> Command<'a> {
     Command::new("tasks")
         .arg_required_else_help(true)
         .about("run daemon for provide service")
-        .args(&[Arg::new("url")
-            .long("url")
-            .env("C2PROXY_URL")
-            .global(true)
-            .default_value("http://127.0.0.1:8888")
-            .required(false)
-            .help("specify url for provide service api service")])
         .subcommand(Command::new("list").about("list task status").args(&[
             // Arg::new("")
         ]))

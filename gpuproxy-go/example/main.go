@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"time"
 
 	"github.com/filecoin-project/go-address"
@@ -41,7 +42,8 @@ func main() {
 
 	var proverId [32]byte
 	copy(proverId[:], commit2In.Miner.Payload())
-	taskId, err := client.SubmitC2Task(commit2In.Phase1Out, commit2In.Miner.String(), proverId, commit2In.SectorNum)
+	miner, _ := address.NewIDAddress(rand.Uint64())
+	taskId, err := client.SubmitC2Task(commit2In.Phase1Out, miner.String(), proverId, commit2In.SectorNum)
 	if err != nil {
 		log.Fatal(err)
 		return

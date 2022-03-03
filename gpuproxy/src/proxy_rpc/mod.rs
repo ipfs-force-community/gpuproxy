@@ -1,3 +1,3 @@
 pub mod db_ops;
-pub mod proof;
+pub mod rpc;
 pub mod worker;

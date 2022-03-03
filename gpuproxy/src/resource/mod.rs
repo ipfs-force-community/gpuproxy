@@ -12,6 +12,7 @@ use std::io::Read;
 use std::path::Path;
 use uuid::Uuid;
 
+/// The data required for computing c2 type tasks
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct C2Resource {
     pub prover_id: ProverId,
@@ -19,6 +20,7 @@ pub struct C2Resource {
     pub c1out: SealCommitPhase1Output,
 }
 
+/// Persist task related data and can implement specific storage media to save data
 #[async_trait]
 pub trait Resource {
     async fn has_resource(&self, resource_id: String) -> Result<bool>;
@@ -26,6 +28,7 @@ pub trait Resource {
     async fn store_resource_info(&self, resource_id: String, resource: Vec<u8>) -> Result<String>;
 }
 
+/// Use files to persist task data
 pub struct FileResource {
     root: String,
 }
@@ -41,11 +44,13 @@ unsafe impl Sync for FileResource {}
 
 #[async_trait]
 impl Resource for FileResource {
+    /// Check if the resource exit
     async fn has_resource(&self, resource_id: String) -> Result<bool> {
         let new_path = Path::new(self.root.as_str()).join(resource_id.clone());
         Ok(new_path.is_file())
     }
 
+    /// get task resource by resource id
     async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
         let new_path = Path::new(self.root.as_str()).join(resource_id.clone());
         let filename = new_path.to_str().ok_or(anyhow!(
@@ -60,6 +65,7 @@ impl Resource for FileResource {
         Ok(Base64Byte::new(buffer))
     }
 
+    /// save task resource to file system
     async fn store_resource_info(&self, resource_id: String, resource: Vec<u8>) -> Result<String> {
         let new_path = Path::new(self.root.as_str()).join(resource_id.clone());
         fs::write(new_path, resource)?;

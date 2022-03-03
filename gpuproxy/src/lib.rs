@@ -11,6 +11,6 @@ pub mod http_server;
 pub mod params_fetch;
 
 pub mod config;
-pub mod proof_rpc;
+pub mod proxy_rpc;
 pub mod resource;
 pub mod utils;

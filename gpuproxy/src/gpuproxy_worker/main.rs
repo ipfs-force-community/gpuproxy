@@ -4,7 +4,7 @@ use crate::worker::Worker;
 use clap::{Arg, Command};
 use gpuproxy::cli;
 use gpuproxy::config::*;
-use gpuproxy::proof_rpc::*;
+use gpuproxy::proxy_rpc::*;
 use gpuproxy::resource;
 use log::*;
 use sea_orm::Database;
@@ -27,7 +27,7 @@ async fn main() {
                     Arg::new("gpuproxy-url")
                         .long("gpuproxy-url")
                         .env("C2PROXY_LISTEN_URL")
-                        .default_value("http://127.0.0.1:8888")
+                        .default_value("http://127.0.0.1:18888")
                         .help("specify url for connect gpuproxy for get task to excute"),
                     Arg::new("db-dsn")
                         .long("db-dsn")
@@ -81,7 +81,7 @@ async fn main() {
             let db_ops = db_ops::DbOpsImpl::new(db_conn);
             let worker_id = db_ops.get_worker_id().await.unwrap();
 
-            let worker_api = Arc::new(proof::get_proxy_api(cfg.url).await.unwrap());
+            let worker_api = Arc::new(rpc::get_proxy_api(cfg.url).await.unwrap());
             let resource: Arc<dyn resource::Resource + Send + Sync> = match cfg.resource {
                 Resource::Db => worker_api.clone(),
                 Resource::FS(path) => Arc::new(resource::FileResource::new(path)),

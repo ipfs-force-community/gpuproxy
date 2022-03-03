@@ -3,8 +3,8 @@ use crate::worker::Worker;
 use clap::{Arg, Command};
 use gpuproxy::cli;
 use gpuproxy::config::*;
-use gpuproxy::proof_rpc::proof::ProofImpl;
-use gpuproxy::proof_rpc::*;
+use gpuproxy::proxy_rpc::rpc::ProxyImpl;
+use gpuproxy::proxy_rpc::*;
 use gpuproxy::resource;
 use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle, RpcModule};
 use log::*;
@@ -19,24 +19,31 @@ use migration::{Migrator, MigratorTrait};
 
 #[tokio::main()]
 async fn main() {
-    let lv = LevelFilter::from_str("trace").unwrap();
-    TermLogger::init(lv, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
-
     let worker_args = cli::worker::get_worker_arg();
     let list_task_cmds = cli::tasks::list_task_cmds().await;
     let fetch_params_cmds = cli::params_fetch_cli::fetch_params_cmds().await;
     let app_m = Command::new("gpuproxy")
         .version("0.0.1")
+        .args(&[
+            Arg::new("url")
+                .long("url")
+                .env("C2PROXY_URL")
+                .global(true)
+                .default_value("127.0.0.1:18888")
+                .required(false)
+                .help("specify url for provide service api service"),
+            Arg::new("log-level")
+                .long("log-level")
+                .global(true)
+                .env("C2PROXY_LOG_LEVEL")
+                .default_value("info")
+                .help("set log level for application"),
+        ])
         .arg_required_else_help(true)
         .subcommand(
             Command::new("run")
                 .about("run daemon for provide service")
                 .args(&[
-                    Arg::new("url")
-                        .long("url")
-                        .env("C2PROXY_URL")
-                        .default_value("127.0.0.1:8888")
-                        .help("specify url for provide service api service"),
                     Arg::new("db-dsn")
                         .long("db-dsn")
                         .env("C2PROXY_DSN")
@@ -54,11 +61,6 @@ async fn main() {
                         .takes_value(false)
                         .default_value("false")
                         .help("disable worker on gpuproxy manager"),
-                    Arg::new("log-level")
-                        .long("log-level")
-                        .env("C2PROXY_LOG_LEVEL")
-                        .default_value("info")
-                        .help("set log level for application"),
                     Arg::new("resource-type")
                         .long("resource-type")
                         .env("C2PROXY_RESOURCE_TYPE")
@@ -87,8 +89,10 @@ async fn main() {
             let resource_type: String = sub_m.value_of_t("resource-type").unwrap_or_else(|e| e.exit());
             let fs_resource_type: String = sub_m.value_of_t("fs-resource-path").unwrap_or_else(|e| e.exit());
             let disable_worker: bool = sub_m.value_of_t("disable-worker").unwrap_or_else(|e| e.exit());
-
             let cfg = ServiceConfig::new(url, db_dsn, max_c2, disable_worker, resource_type, fs_resource_type, log_level.clone());
+
+            let lv = LevelFilter::from_str(cfg.log_level.as_str()).unwrap();
+            TermLogger::init(lv, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
 
             run_cfg(cfg).await;
         } // run was used
@@ -121,20 +125,21 @@ async fn run_cfg(cfg: ServiceConfig) {
 
     let worker = worker::LocalWorker::new(cfg.max_c2, worker_id.to_string(), resource.clone(), arc_pool.clone());
 
-    let rpc_module = proof::register(resource, arc_pool);
+    let rpc_module = rpc::register(resource, arc_pool);
     if !cfg.disable_worker {
         worker.process_tasks().await;
         info!("ready for local worker address worker_id {}", worker_id);
     }
 
-    let (server_addr, _handle) = run_server(rpc_module).await.unwrap();
+    println!("{}", cfg.url.clone());
+    let (server_addr, _handle) = run_server(cfg.url.as_str(), rpc_module).await.unwrap();
     info!("starting listening {}", server_addr);
     let () = futures::future::pending().await;
     info!("Shutting Down");
 } //run cfg
 
-async fn run_server(module: RpcModule<ProofImpl>) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
-    let server = HttpServerBuilder::default().build("127.0.0.1:8888".parse::<SocketAddr>()?)?;
+async fn run_server(url:&str, module: RpcModule<ProxyImpl>) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
+    let server = HttpServerBuilder::default().build(url.parse::<SocketAddr>()?)?;
 
     let addr = server.local_addr()?;
     let server_handle = server.start(module)?;

@@ -33,7 +33,7 @@ pub trait WorkerApi {
 #[async_trait]
 pub trait WorkerFetch {
     async fn fetch_one_todo(&self, worker_id_arg: String) -> Result<Task>;
-    async fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>>;
+    async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>>;
     async fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String) -> Option<anyhow::Error>;
     async fn record_proof(&self, worker_id_arg: String, tid: String, proof: String) -> Option<anyhow::Error>;
 }
@@ -101,7 +101,7 @@ impl WorkerFetch for DbOpsImpl {
         }
     }
 
-    async fn fetch_uncomplte(&self, worker_id_arg: String) -> Result<Vec<Task>> {
+    async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>> {
         Tasks::Entity::find()
             .filter(Tasks::Column::State.eq(TaskState::Running))
             .filter(Tasks::Column::WorkerId.eq(worker_id_arg))

@@ -1,4 +1,4 @@
-use crate::proof_rpc::db_ops::*;
+use crate::proxy_rpc::db_ops::*;
 use filecoin_proofs_api::{ProverId, SectorId};
 use std::str::FromStr;
 
@@ -23,7 +23,7 @@ use Tasks::Model as Task;
 use WorkerInfos::Model as WorkerInfo;
 
 #[rpc(server, client)]
-pub trait ProofRpc {
+pub trait ProxyRpc {
     #[method(name = "Proof.SubmitC2Task")]
     async fn submit_c2_task(&self, phase1_output: Base64Byte, miner: String, prover_id: ProverId, sector_id: u64) -> RpcResult<String>;
 
@@ -37,7 +37,7 @@ pub trait ProofRpc {
     async fn fetch_todo(&self, worker_id_arg: String) -> RpcResult<Task>;
 
     #[method(name = "Proof.FetchUncomplete")]
-    async fn fetch_uncomplte(&self, worker_id_arg: String) -> RpcResult<Vec<Task>>;
+    async fn fetch_uncompleted(&self, worker_id_arg: String) -> RpcResult<Vec<Task>>;
 
     #[method(name = "Proof.GetResourceInfo")]
     async fn get_resource_info(&self, resource_id_arg: String) -> RpcResult<Base64Byte>;
@@ -55,13 +55,14 @@ pub trait ProofRpc {
     async fn update_status_by_id(&self, tids: Vec<String>, status: entity::tasks::TaskState) -> RpcResult<bool>;
 }
 
-pub struct ProofImpl {
+pub struct ProxyImpl {
     resource: Arc<dyn resource::Resource + Send + Sync>,
     pool: Arc<dyn DbOp + Send + Sync>,
 }
 
 #[async_trait]
-impl ProofRpcServer for ProofImpl {
+impl ProxyRpcServer for ProxyImpl {
+    /// Submit C2 task this api if used for golang, compatable with Goland invoke parameters and return
     async fn submit_c2_task(&self, phase1_output: Base64Byte, miner: String, prover_id: ProverId, sector_id: u64) -> RpcResult<String> {
         let scp1o = serde_json::from_slice(Into::<Vec<u8>>::into(phase1_output).as_slice()).to_jsonrpc_result(InvalidParams)?;
         let addr = forest_address::Address::from_str(miner.as_str()).to_jsonrpc_result(InvalidParams)?;
@@ -96,6 +97,7 @@ impl ProofRpcServer for ProofImpl {
         Ok(task_id)
     }
 
+    /// Add specify task into gpuproxy, params must be base64 encoded bytes
     async fn add_task(&self, miner: String, task_type: TaskType, param: Base64Byte) -> RpcResult<String> {
         let addr = forest_address::Address::from_str(miner.as_str()).to_jsonrpc_result(InvalidParams)?;
         //check
@@ -120,48 +122,59 @@ impl ProofRpcServer for ProofImpl {
         self.pool.add_task(task_id, addr, TaskType::C2, resource_id).await.to_jsonrpc_result(InternalError)
     }
 
+    /// Get task by id
     async fn get_task(&self, id: String) -> RpcResult<Task> {
         self.pool.fetch(id).await.to_jsonrpc_result(InternalError)
     }
 
+    /// Fetch a undo task and mark it to running
     async fn fetch_todo(&self, worker_id_arg: String) -> RpcResult<Task> {
         self.pool.fetch_one_todo(worker_id_arg).await.to_jsonrpc_result(InternalError)
     }
 
-    async fn fetch_uncomplte(&self, worker_id_arg: String) -> RpcResult<Vec<Task>> {
-        self.pool.fetch_uncomplte(worker_id_arg).await.to_jsonrpc_result(InternalError)
+    /// Fetch uncompleted task for specify worker
+    async fn fetch_uncompleted(&self, worker_id_arg: String) -> RpcResult<Vec<Task>> {
+        self.pool.fetch_uncompleted(worker_id_arg).await.to_jsonrpc_result(InternalError)
     }
 
+    /// Get resource data by resource id
     async fn get_resource_info(&self, resource_id_arg: String) -> RpcResult<Base64Byte> {
         self.resource.get_resource_info(resource_id_arg).await.to_jsonrpc_result(InternalError)
     }
 
+    /// Record task result after completed computing task
     async fn record_proof(&self, worker_id_arg: String, tid: String, proof: String) -> RpcResult<bool> {
         self.pool.record_proof(worker_id_arg, tid, proof).await.reverse_map_err()
     }
 
+    /// Record task error while completing
     async fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String) -> RpcResult<bool> {
         self.pool.record_error(worker_id_arg, tid, err_msg).await.reverse_map_err()
     }
 
+    /// List task by worker id and task state
     async fn list_task(&self, worker_id_arg: Option<String>, state: Option<Vec<entity::tasks::TaskState>>) -> RpcResult<Vec<Task>> {
         self.pool.list_task(worker_id_arg, state).await.to_jsonrpc_result(InternalError)
     }
 
+    /// Update task status by task ids
     async fn update_status_by_id(&self, tids: Vec<String>, state: entity::tasks::TaskState) -> RpcResult<bool> {
         self.pool.update_status_by_id(tids, state).await.reverse_map_err()
     }
 }
 
-pub fn register(resource: Arc<dyn resource::Resource + Send + Sync>, pool: Arc<dyn DbOp + Send + Sync>) -> RpcModule<ProofImpl> {
-    let proof_impl = ProofImpl { resource, pool };
+/// new proxy apu impl and get rpc moudle
+pub fn register(resource: Arc<dyn resource::Resource + Send + Sync>, pool: Arc<dyn DbOp + Send + Sync>) -> RpcModule<ProxyImpl> {
+    let proof_impl = ProxyImpl { resource, pool };
     proof_impl.into_rpc()
 }
 
+/// get proxy api by url
 pub async fn get_proxy_api(url: String) -> anyhow::Result<WrapClient> {
     HttpClientBuilder::default().build(url.as_str()).map(|val| WrapClient { client: val }).anyhow()
 }
 
+/// WrapClient for rpc error, convert RpcResult to anyhow Result
 pub struct WrapClient {
     client: HttpClient,
 }
@@ -187,8 +200,8 @@ impl WorkerFetch for WrapClient {
         self.client.fetch_todo(worker_id).await.anyhow()
     }
 
-    async fn fetch_uncomplte(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>> {
-        self.client.fetch_uncomplte(worker_id_arg).await.anyhow()
+    async fn fetch_uncompleted(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>> {
+        self.client.fetch_uncompleted(worker_id_arg).await.anyhow()
     }
 
     async fn record_error(&self, worker_id: String, tid: String, err_msg: String) -> Option<anyhow::Error> {
@@ -211,7 +224,7 @@ pub trait GpuServiceRpcClient {
 
     async fn fetch_todo(&self, worker_id_arg: String) -> anyhow::Result<Task>;
 
-    async fn fetch_uncomplte(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>>;
+    async fn fetch_uncompleted(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>>;
 
     async fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Base64Byte>;
 
@@ -248,8 +261,8 @@ impl GpuServiceRpcClient for WrapClient {
         self.client.fetch_todo(worker_id_arg).await.anyhow()
     }
 
-    async fn fetch_uncomplte(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>> {
-        self.client.fetch_uncomplte(worker_id_arg).await.anyhow()
+    async fn fetch_uncompleted(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>> {
+        self.client.fetch_uncompleted(worker_id_arg).await.anyhow()
     }
 
     async fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Base64Byte> {

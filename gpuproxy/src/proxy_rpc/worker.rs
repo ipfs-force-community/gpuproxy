@@ -1,4 +1,4 @@
-use crate::proof_rpc::db_ops::*;
+use crate::proxy_rpc::db_ops::*;
 use crate::resource::{C2Resource, Resource};
 use anyhow::{anyhow, Result};
 use crossbeam_channel::tick;
@@ -7,7 +7,6 @@ use log::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use tokio::sync::oneshot;
 
 use crate::utils::*;
 use async_trait::async_trait;
@@ -20,11 +19,13 @@ use ResourceInfos::Model as ResourceInfo;
 use Tasks::Model as Task;
 use WorkerInfos::Model as WorkerInfo;
 
+/// GPU worker used to execute specify task
 #[async_trait]
 pub trait Worker {
     async fn process_tasks(self);
 }
 
+/// Local worker to execute gpu task in local machine
 pub struct LocalWorker {
     pub worker_id: String,
     pub max_task: usize,
@@ -50,8 +51,8 @@ impl LocalWorker {
 
 #[async_trait]
 impl Worker for LocalWorker {
-    async fn process_tasks(self) {
-        let (tx, mut rx) = channel(5);
+    async  fn process_tasks(self) {
+        let (tx, mut rx) = channel(self.max_task);
         let fetcher = Arc::new(self.task_fetcher);
         let count = Arc::new(AtomicUsize::new(0));
 
@@ -62,7 +63,7 @@ impl Worker for LocalWorker {
             tokio::spawn(
                 futures::future::lazy(async move |_| {
                     info!("start task fetcher, wait for new task todo");
-                    let mut un_complete_task_result = fetcher.fetch_uncomplte(worker_id.to_string()).await.unwrap();
+                    let mut un_complete_task_result = fetcher.fetch_uncompleted(worker_id.to_string()).await.unwrap();
                     let ticker = tick(Duration::from_secs(10));
                     loop {
                         ticker.recv().unwrap();
@@ -146,7 +147,7 @@ impl Worker for LocalWorker {
                                         }
                                         None => {
                                             error!("unable to fetch undo task, should never occur");
-                                            sleep(Duration::from_millis(100)).await;
+                                            sleep(Duration::from_secs(60)).await;
                                         }
                                     }
                             }
@@ -178,7 +179,7 @@ impl Worker for LocalWorker {
                                         }
                                 }
                             }
-                            _ = sleep(Duration::from_secs(10)) =>{info!("wait for new task or execute result")}
+                            _ = sleep(Duration::from_secs(10)) =>{debug!("wait for new task or execute result")}
                         }
                     }
                 })

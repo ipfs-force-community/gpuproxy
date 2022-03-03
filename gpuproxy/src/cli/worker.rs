@@ -1,4 +1,4 @@
-use crate::proof_rpc::proof::{get_proxy_api, GpuServiceRpcClient};
+use crate::proxy_rpc::rpc::{get_proxy_api, GpuServiceRpcClient};
 use clap::{Arg, ArgMatches, Command};
 
 pub fn get_worker_arg<'a>() -> Vec<Arg<'a>> {
