@@ -86,19 +86,39 @@ async fn main() {
             let max_c2: usize = sub_m.value_of_t("max-c2").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
             let log_level: String = sub_m.value_of_t("log-level").unwrap_or_else(|e| e.exit());
-            let resource_type: String = sub_m.value_of_t("resource-type").unwrap_or_else(|e| e.exit());
-            let fs_resource_type: String = sub_m.value_of_t("fs-resource-path").unwrap_or_else(|e| e.exit());
-            let disable_worker: bool = sub_m.value_of_t("disable-worker").unwrap_or_else(|e| e.exit());
-            let cfg = ServiceConfig::new(url, db_dsn, max_c2, disable_worker, resource_type, fs_resource_type, log_level.clone());
+            let resource_type: String = sub_m
+                .value_of_t("resource-type")
+                .unwrap_or_else(|e| e.exit());
+            let fs_resource_type: String = sub_m
+                .value_of_t("fs-resource-path")
+                .unwrap_or_else(|e| e.exit());
+            let disable_worker: bool = sub_m
+                .value_of_t("disable-worker")
+                .unwrap_or_else(|e| e.exit());
+            let cfg = ServiceConfig::new(
+                url,
+                db_dsn,
+                max_c2,
+                disable_worker,
+                resource_type,
+                fs_resource_type,
+                log_level.clone(),
+            );
 
             let lv = LevelFilter::from_str(cfg.log_level.as_str()).unwrap();
-            TermLogger::init(lv, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
+            TermLogger::init(
+                lv,
+                Config::default(),
+                TerminalMode::Mixed,
+                ColorChoice::Auto,
+            )
+            .unwrap();
 
             run_cfg(cfg).await;
         } // run was used
         Some(("tasks", ref sub_m)) => cli::tasks_command(sub_m).await, // task was used
         Some(("paramfetch", ref sub_m)) => cli::fetch_params_command(sub_m).await, // run was used
-        _ => {}                                                        // Either no subcommand or one not tested for...
+        _ => {} // Either no subcommand or one not tested for...
     }
 }
 
@@ -123,7 +143,12 @@ async fn run_cfg(cfg: ServiceConfig) {
         Resource::FS(path) => Arc::new(resource::FileResource::new(path)),
     };
 
-    let worker = worker::LocalWorker::new(cfg.max_c2, worker_id.to_string(), resource.clone(), arc_pool.clone());
+    let worker = worker::LocalWorker::new(
+        cfg.max_c2,
+        worker_id.to_string(),
+        resource.clone(),
+        arc_pool.clone(),
+    );
 
     let rpc_module = rpc::register(resource, arc_pool);
     if !cfg.disable_worker {
@@ -137,8 +162,13 @@ async fn run_cfg(cfg: ServiceConfig) {
     info!("Shutting Down");
 } //run cfg
 
-async fn run_server(url: &str, module: RpcModule<ProxyImpl>) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
-    let server = HttpServerBuilder::default().build(url.parse::<SocketAddr>()?)?;
+async fn run_server(
+    url: &str,
+    module: RpcModule<ProxyImpl>,
+) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
+    let server = HttpServerBuilder::default()
+        .max_request_body_size(1024 * 1024 * 1024)
+        .build(url.parse::<SocketAddr>()?)?;
 
     let addr = server.local_addr()?;
     let server_handle = server.start(module)?;

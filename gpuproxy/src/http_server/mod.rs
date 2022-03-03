@@ -37,4 +37,6 @@ pub mod middleware;
 pub mod response;
 pub use jsonrpsee::core::server::rpc_module::RpcModule;
 pub use jsonrpsee::types;
-pub use server::{Builder as HttpServerBuilder, Server as HttpServer, ServerHandle as HttpServerHandle};
+pub use server::{
+    Builder as HttpServerBuilder, Server as HttpServer, ServerHandle as HttpServerHandle,
+};

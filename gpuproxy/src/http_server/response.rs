@@ -34,15 +34,22 @@ const TEXT: &str = "text/plain";
 
 /// Create a response for json internal error.
 pub fn internal_error() -> hyper::Response<hyper::Body> {
-    let error =
-        serde_json::to_string(&ErrorResponse::new(ErrorCode::InternalError.into(), Id::Null)).expect("built from known-good data; qed");
+    let error = serde_json::to_string(&ErrorResponse::new(
+        ErrorCode::InternalError.into(),
+        Id::Null,
+    ))
+    .expect("built from known-good data; qed");
 
     from_template(hyper::StatusCode::INTERNAL_SERVER_ERROR, error, JSON)
 }
 
 /// Create a text/plain response for not allowed hosts.
 pub fn host_not_allowed() -> hyper::Response<hyper::Body> {
-    from_template(hyper::StatusCode::FORBIDDEN, "Provided Host header is not whitelisted.\n".to_owned(), TEXT)
+    from_template(
+        hyper::StatusCode::FORBIDDEN,
+        "Provided Host header is not whitelisted.\n".to_owned(),
+        TEXT,
+    )
 }
 
 /// Create a text/plain response for disallowed method used.
@@ -76,25 +83,35 @@ pub fn invalid_allow_headers() -> hyper::Response<hyper::Body> {
 
 /// Create a json response for oversized requests (413)
 pub fn too_large() -> hyper::Response<hyper::Body> {
-    let error =
-        serde_json::to_string(&ErrorResponse::new(ErrorCode::OversizedRequest.into(), Id::Null)).expect("built from known-good data; qed");
+    let error = serde_json::to_string(&ErrorResponse::new(
+        ErrorCode::OversizedRequest.into(),
+        Id::Null,
+    ))
+    .expect("built from known-good data; qed");
 
     from_template(hyper::StatusCode::PAYLOAD_TOO_LARGE, error, JSON)
 }
 
 /// Create a json response for empty or malformed requests (400)
 pub fn malformed() -> hyper::Response<hyper::Body> {
-    let error =
-        serde_json::to_string(&ErrorResponse::new(ErrorCode::ParseError.into(), Id::Null)).expect("built from known-good data; qed");
+    let error = serde_json::to_string(&ErrorResponse::new(ErrorCode::ParseError.into(), Id::Null))
+        .expect("built from known-good data; qed");
 
     from_template(hyper::StatusCode::BAD_REQUEST, error, JSON)
 }
 
 /// Create a response body.
-fn from_template<S: Into<hyper::Body>>(status: hyper::StatusCode, body: S, content_type: &'static str) -> hyper::Response<hyper::Body> {
+fn from_template<S: Into<hyper::Body>>(
+    status: hyper::StatusCode,
+    body: S,
+    content_type: &'static str,
+) -> hyper::Response<hyper::Body> {
     hyper::Response::builder()
         .status(status)
-        .header("content-type", hyper::header::HeaderValue::from_static(content_type))
+        .header(
+            "content-type",
+            hyper::header::HeaderValue::from_static(content_type),
+        )
         .body(body.into())
         // Parsing `StatusCode` and `HeaderValue` is infalliable but
         // parsing body content is not.
@@ -110,7 +127,8 @@ pub fn ok_response(body: String) -> hyper::Response<hyper::Body> {
 pub fn unsupported_content_type() -> hyper::Response<hyper::Body> {
     from_template(
         hyper::StatusCode::UNSUPPORTED_MEDIA_TYPE,
-        "Supplied content type is not allowed. Content-Type: application/json is required\n".to_owned(),
+        "Supplied content type is not allowed. Content-Type: application/json is required\n"
+            .to_owned(),
         TEXT,
     )
 }

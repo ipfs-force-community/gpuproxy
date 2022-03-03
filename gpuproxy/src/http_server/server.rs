@@ -138,7 +138,12 @@ impl<M> Builder<M> {
     ///
     /// See the module documentation for [`resurce_limiting`](../jsonrpsee_utils/server/resource_limiting/index.html#resource-limiting)
     /// for details.
-    pub fn register_resource(mut self, label: &'static str, capacity: u16, default: u16) -> Result<Self, Error> {
+    pub fn register_resource(
+        mut self,
+        label: &'static str,
+        capacity: u16,
+        default: u16,
+    ) -> Result<Self, Error> {
         self.resources.register(label, capacity, default)?;
 
         Ok(self)
@@ -189,14 +194,22 @@ impl<M> Builder<M> {
             });
         }
 
-        let err = err.unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "No address found").into());
+        let err = err.unwrap_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "No address found").into()
+        });
         Err(err)
     }
 
     fn inner_builder(
         &self,
         addr: SocketAddr,
-    ) -> Result<(hyper::server::Builder<hyper::server::conn::AddrIncoming>, Option<SocketAddr>), Error> {
+    ) -> Result<
+        (
+            hyper::server::Builder<hyper::server::conn::AddrIncoming>,
+            Option<SocketAddr>,
+        ),
+        Error,
+    > {
         let domain = Domain::for_address(addr);
         let socket = Socket::new(domain, Type::STREAM, None)?;
         socket.set_nodelay(true)?;
@@ -264,7 +277,8 @@ pub struct Server<M = ()> {
 impl<M: Middleware> Server<M> {
     /// Returns socket address to which the server is bound.
     pub fn local_addr(&self) -> Result<SocketAddr, Error> {
-        self.local_addr.ok_or_else(|| Error::Custom("Local address not found".into()))
+        self.local_addr
+            .ok_or_else(|| Error::Custom("Local address not found".into()))
     }
 
     /// Start the server.
@@ -293,8 +307,17 @@ impl<M: Middleware> Server<M> {
                         // Only `POST` and `OPTIONS` methods are allowed.
                         match *request.method() {
                             Method::POST if content_type_is_json(&request) => {
-                                let origin = return_origin_if_different_from_host(request.headers()).cloned();
-                                let res = process_validated_request(request, middleware, methods, resources, max_request_body_size).await?;
+                                let origin =
+                                    return_origin_if_different_from_host(request.headers())
+                                        .cloned();
+                                let res = process_validated_request(
+                                    request,
+                                    middleware,
+                                    methods,
+                                    resources,
+                                    max_request_body_size,
+                                )
+                                .await?;
                                 Ok::<_, HyperError>(res)
                             }
                             // Error scenarios:
@@ -313,7 +336,9 @@ impl<M: Middleware> Server<M> {
 
         let handle = rt.spawn(async move {
             let server = listener.serve(make_service);
-            let _ = server.with_graceful_shutdown(async move { rx.next().await.map_or((), |_| ()) }).await;
+            let _ = server
+                .with_graceful_shutdown(async move { rx.next().await.map_or((), |_| ()) })
+                .await;
         });
 
         Ok(ServerHandle {
@@ -397,29 +422,40 @@ async fn process_validated_request(
                     false
                 }
                 Some((name, method_callback)) => match method_callback.inner() {
-                    MethodKind::Sync(callback) => match method_callback.claim(&req.method, &resources) {
-                        Ok(guard) => {
-                            let result = (callback)(id, params, &sink);
-                            drop(guard);
-                            result
+                    MethodKind::Sync(callback) => {
+                        match method_callback.claim(&req.method, &resources) {
+                            Ok(guard) => {
+                                let result = (callback)(id, params, &sink);
+                                drop(guard);
+                                result
+                            }
+                            Err(err) => {
+                                error!("[Methods::execute_with_resources] failed to lock resources: {:?}", err);
+                                sink.send_error(req.id, ErrorCode::ServerIsBusy.into());
+                                false
+                            }
                         }
-                        Err(err) => {
-                            error!("[Methods::execute_with_resources] failed to lock resources: {:?}", err);
-                            sink.send_error(req.id, ErrorCode::ServerIsBusy.into());
-                            false
+                    }
+                    MethodKind::Async(callback) => {
+                        match method_callback.claim(name, &resources) {
+                            Ok(guard) => {
+                                let result = (callback)(
+                                    id.into_owned(),
+                                    params.into_owned(),
+                                    sink.clone(),
+                                    0,
+                                    Some(guard),
+                                )
+                                .await;
+                                result
+                            }
+                            Err(err) => {
+                                error!("[Methods::execute_with_resources] failed to lock resources: {:?}", err);
+                                sink.send_error(req.id, ErrorCode::ServerIsBusy.into());
+                                false
+                            }
                         }
-                    },
-                    MethodKind::Async(callback) => match method_callback.claim(name, &resources) {
-                        Ok(guard) => {
-                            let result = (callback)(id.into_owned(), params.into_owned(), sink.clone(), 0, Some(guard)).await;
-                            result
-                        }
-                        Err(err) => {
-                            error!("[Methods::execute_with_resources] failed to lock resources: {:?}", err);
-                            sink.send_error(req.id, ErrorCode::ServerIsBusy.into());
-                            false
-                        }
-                    },
+                    }
                     MethodKind::Subscription(_) => {
                         error!("Subscriptions not supported on HTTP");
                         sink.send_error(req.id, ErrorCode::InternalError.into());
@@ -514,10 +550,15 @@ async fn process_validated_request(
     // messages from being sent on the channel.
     rx.close();
     let response = if is_single {
-        rx.next().await.expect("Sender is still alive managed by us above; qed")
+        rx.next()
+            .await
+            .expect("Sender is still alive managed by us above; qed")
     } else {
         collect_batch_response(rx).await
     };
-    debug!("[service_fn] sending back: {:?}", &response[..cmp::min(response.len(), 1024)]);
+    debug!(
+        "[service_fn] sending back: {:?}",
+        &response[..cmp::min(response.len(), 1024)]
+    );
     Ok(response::ok_response(response))
 }

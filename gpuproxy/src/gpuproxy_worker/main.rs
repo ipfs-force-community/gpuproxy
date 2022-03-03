@@ -63,17 +63,36 @@ async fn main() {
         Some(("run", ref sub_m)) => {
             cli::set_worker_env(sub_m);
 
-            let url: String = sub_m.value_of_t("gpuproxy-url").unwrap_or_else(|e| e.exit());
+            let url: String = sub_m
+                .value_of_t("gpuproxy-url")
+                .unwrap_or_else(|e| e.exit());
             let max_c2: usize = sub_m.value_of_t("max-c2").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
             let log_level: String = sub_m.value_of_t("log-level").unwrap_or_else(|e| e.exit());
-            let resource_type: String = sub_m.value_of_t("resource-type").unwrap_or_else(|e| e.exit());
-            let fs_resource_type: String = sub_m.value_of_t("fs-resource-path").unwrap_or_else(|e| e.exit());
+            let resource_type: String = sub_m
+                .value_of_t("resource-type")
+                .unwrap_or_else(|e| e.exit());
+            let fs_resource_type: String = sub_m
+                .value_of_t("fs-resource-path")
+                .unwrap_or_else(|e| e.exit());
 
-            let cfg = WorkerConfig::new(url, db_dsn, max_c2, resource_type, fs_resource_type, log_level);
+            let cfg = WorkerConfig::new(
+                url,
+                db_dsn,
+                max_c2,
+                resource_type,
+                fs_resource_type,
+                log_level,
+            );
 
             let lv = LevelFilter::from_str(cfg.log_level.as_str()).unwrap();
-            TermLogger::init(lv, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
+            TermLogger::init(
+                lv,
+                Config::default(),
+                TerminalMode::Mixed,
+                ColorChoice::Auto,
+            )
+            .unwrap();
 
             let db_conn = Database::connect(cfg.db_dsn.as_str()).await.unwrap();
             Migrator::up(&db_conn, None).await.unwrap();
@@ -87,7 +106,8 @@ async fn main() {
                 Resource::FS(path) => Arc::new(resource::FileResource::new(path)),
             };
 
-            let worker = worker::LocalWorker::new(cfg.max_c2, worker_id.to_string(), resource, worker_api);
+            let worker =
+                worker::LocalWorker::new(cfg.max_c2, worker_id.to_string(), resource, worker_api);
             worker.process_tasks().await;
             info!("ready for local worker address worker_id {}", worker_id);
             let () = futures::future::pending().await;

@@ -1,5 +1,6 @@
 use anyhow::anyhow;
-use jsonrpsee::types::error::ErrorCode;
+use jsonrpsee::types::error::{CallError, ErrorCode};
+use jsonrpsee_core::Error::Call;
 use log::error;
 use std::fmt::Display;
 use std::pin::Pin;
@@ -32,13 +33,9 @@ where
 {
     fn reverse_map_err(self) -> jsonrpsee::core::RpcResult<bool> {
         match self {
-            Some(val) => Err(
-                jsonrpsee::core::Error::Custom(val.to_string()), /* jsonrpsee::core::{
-                                                                     code: jsonrpc_core::ErrorCode::InternalError,
-                                                                     message: val.to_string(),
-                                                                     data:None,
-                                                                 }*/
-            ),
+            Some(e) => Err(jsonrpsee::core::Error::Call(CallError::Failed(anyhow!(
+                "{}", e
+            )))),
             _ => Ok(true),
         }
     }
@@ -61,15 +58,20 @@ impl<T> IfNotFound<T> for Option<T> {
 
 /// convert std result to jsonrpsee result
 pub trait IntoJsonRpcResult<T> {
-    fn to_jsonrpc_result(self, code: ErrorCode) -> jsonrpsee::core::RpcResult<T>;
+    fn invalid_params(self) -> jsonrpsee::core::RpcResult<T>;
+    fn internal_call_error(self) -> jsonrpsee::core::RpcResult<T>;
 }
 
 impl<T, E> IntoJsonRpcResult<T> for Result<T, E>
 where
     E: Display,
 {
-    fn to_jsonrpc_result(self, code: ErrorCode) -> jsonrpsee::core::RpcResult<T> {
-        self.map_err(|e| jsonrpsee::core::Error::Custom(e.to_string()))
+    fn invalid_params(self) -> jsonrpsee::core::RpcResult<T> {
+        self.map_err(|e| jsonrpsee::core::Error::Call(CallError::InvalidParams(anyhow!("{}", e))))
+    }
+
+    fn internal_call_error(self) -> jsonrpsee::core::RpcResult<T> {
+        self.map_err(|e| jsonrpsee::core::Error::Call(CallError::Failed(anyhow!("{}", e))))
     }
 }
 

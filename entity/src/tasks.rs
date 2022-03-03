@@ -2,6 +2,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
+use std::fmt;
 
 /// Used to indicate the state of the current task, the inner type is i32
 /// 0 Undefined old state
@@ -26,6 +27,12 @@ pub enum TaskState {
     Completed = 4,
 }
 
+impl fmt::Display for TaskState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
+}
+
 /// The type of task, only c2 task supported for now
 #[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(i32)]
@@ -34,6 +41,12 @@ pub enum TaskState {
 pub enum TaskType {
     #[sea_orm(num_value = 0)]
     C2 = 0,
+}
+
+impl fmt::Display for TaskType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
 }
 
 /// Task Model, Used to save task-related information, such as task status, type, parameters, and results

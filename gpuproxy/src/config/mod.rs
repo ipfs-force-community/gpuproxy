@@ -58,7 +58,14 @@ pub struct WorkerConfig {
 }
 
 impl WorkerConfig {
-    pub fn new(url: String, db_dsn: String, max_c2: usize, resource_type: String, resource_path: String, log_level: String) -> Self {
+    pub fn new(
+        url: String,
+        db_dsn: String,
+        max_c2: usize,
+        resource_type: String,
+        resource_path: String,
+        log_level: String,
+    ) -> Self {
         let resource = if resource_type == "db" {
             Resource::Db
         } else {

@@ -11,7 +11,10 @@ pub fn get_worker_arg<'a>() -> Vec<Arg<'a>> {
 }
 
 pub fn set_worker_env(sub_m: &&ArgMatches) {
-    if sub_m.value_of_t::<bool>("no-gpu").unwrap_or_else(|e| e.exit()) {
+    if sub_m
+        .value_of_t::<bool>("no-gpu")
+        .unwrap_or_else(|e| e.exit())
+    {
         std::env::set_var("BELLMAN_NO_GPU", "1");
     }
 }
