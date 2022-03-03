@@ -55,7 +55,7 @@ func (v *Visitor) Visit(node ast.Node) ast.Visitor {
 
 func main() {
 	// latest (v1)
-	if err := generate("./", "c2proxy_go", "c2proxy_go", "./proxy_gen.go"); err != nil {
+	if err := generate(".", "gpuproxy_go", "gpuproxy_go", "./proxy_gen.go"); err != nil {
 		fmt.Println("error: ", err)
 	}
 }
@@ -295,12 +295,10 @@ import (
 	err = doTemplate(w, m, `
 {{range .Infos}}
 type {{.Name}}Struct struct {
-{{range .Include}}
-	{{.}}Struct
+{{range .Include}}	{{.}}Struct
 {{end}}
 	Internal struct {
-{{range .Methods}}
-		{{.Name}} func({{.NamedParams}}) ({{.Results}}) `+"`"+`{{range .Tags}}{{index . 0}}:"{{index . 1}}"{{end}}`+"`"+`
+{{range .Methods}}	{{.Name}} func({{.NamedParams}}) ({{.Results}}) `+"`"+`{{range .Tags}}{{index . 0}}:"{{index . 1}}"{{end}}`+"`"+`
 {{end}}
 	}
 }
@@ -309,8 +307,7 @@ type {{.Name}}Stub struct {
 {{range .Include}}
 	{{.}}Stub
 {{end}}
-}
-{{end}}
+}{{end}}
 
 {{range .Infos}}
 {{$name := .Name}}
@@ -322,8 +319,7 @@ func (s *{{$name}}Struct) {{.Name}}({{.NamedParams}}) ({{.Results}}) {
 func (s *{{$name}}Stub) {{.Name}}({{.NamedParams}}) ({{.Results}}) {
 	return {{.DefRes}}xerrors.New("method not supported")
 }
-{{end}}
-{{end}}
+{{end}}{{end}}
 
 {{range .Infos}}var _ {{.Name}} = new({{.Name}}Struct)
 {{end}}
