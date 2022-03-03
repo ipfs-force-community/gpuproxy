@@ -66,12 +66,12 @@ impl ProxyRpcServer for ProxyImpl {
     async fn submit_c2_task(&self, phase1_output: Base64Byte, miner: String, prover_id: ProverId, sector_id: u64) -> RpcResult<String> {
         let scp1o = serde_json::from_slice(Into::<Vec<u8>>::into(phase1_output).as_slice()).to_jsonrpc_result(InvalidParams)?;
         let addr = forest_address::Address::from_str(miner.as_str()).to_jsonrpc_result(InvalidParams)?;
-        let c2_resurce = resource::C2Resource {
-            prover_id: prover_id,
+        let c2_resource = resource::C2Resource {
+            prover_id,
             sector_id: SectorId::from(sector_id),
             c1out: scp1o,
         };
-        let resource_bytes = serde_json::to_vec(&c2_resurce).to_jsonrpc_result(InternalError)?;
+        let resource_bytes = serde_json::to_vec(&c2_resource).to_jsonrpc_result(InternalError)?;
         let resource_id = Uuid::new_v5(&Uuid::NAMESPACE_OID, &resource_bytes).to_string();
         if !self.resource.has_resource(resource_id.clone()).await? {
             let _ = self
