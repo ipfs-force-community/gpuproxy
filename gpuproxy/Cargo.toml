@@ -23,49 +23,41 @@ path = "src/gpuproxy_worker/main.rs"
 [dependencies]
 entity = { path = "../entity" }
 migration = { path = "../migration" }
+
 async-trait = "0.1.52"
 storage-proofs-core = "11.0.2"
 filecoin-proofs = "11.0.2"
 filecoin-proofs-api = "11.0.0"
-
 clap = { version = "3.0.4", features = ["derive", "env"] }
 jsonrpsee = { version = "^0.8.0", features = ["full"] }
 jsonrpsee-core = "0.9.0"
-futures-channel = "0.3.21"
-futures-util = "0.3.21"
-hyper = "0.14.17"
-socket2 = "0.4.4"
-
-globset = "0.4.8"
-lazy_static = "1.4.0"
-unicase = "2.6.0"
+futures = "0.3.21"
 log = { version = "0.4", features = ["std"] }
 simplelog = "*"
-sea-schema = { version = "0.5.1", default-features = false, features = [ "migration", "debug-print" ] }
 forest_address = "0.3.2"
-num_enum = "0.5.6"
 anyhow = "1.0.52"
-crossbeam-channel = "0.5.2"
 serde_json = { version = "1.0" }
 serde_repr = "0.1"
 serde = "1.0.133"
 chrono = "0.4.19"
-crossbeam = "0.8.1"
-crossbeam-utils = "0.8.6"
 base64 = "0.13.0"
 bytes = "1.1.0"
 uuid = { version = "0.8", features = ["v4", "v5"] }
-defer = "0.1.0"
 scopeguard = "1.1.0"
 tokio = { version = "1.8.0", features = ["full"] }
-futures = "0.3.21"
 
+# params fetch
 flate2 = "1.0.22"
 humansize = "1.1.1"
 reqwest = {version = "0.11.9", features = ["blocking", "native-tls-vendored"]}
 pbr = "1.0.4"
 tar = "0.4.38"
 
+# http server
+futures-channel = "0.3.21"
+futures-util = "0.3.21"
+hyper = "0.14.17"
+socket2 = "0.4.4"
 
 [dependencies.sea-orm]
 version ="0.6.0"

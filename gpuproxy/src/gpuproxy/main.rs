@@ -131,7 +131,6 @@ async fn run_cfg(cfg: ServiceConfig) {
         info!("ready for local worker address worker_id {}", worker_id);
     }
 
-    println!("{}", cfg.url.clone());
     let (server_addr, _handle) = run_server(cfg.url.as_str(), rpc_module).await.unwrap();
     info!("starting listening {}", server_addr);
     let () = futures::future::pending().await;

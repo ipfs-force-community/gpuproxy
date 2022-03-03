@@ -1,13 +1,12 @@
 use crate::proxy_rpc::db_ops::*;
 use crate::resource::{C2Resource, Resource};
 use anyhow::{anyhow, Result};
-use crossbeam_channel::tick;
 use filecoin_proofs_api::seal::seal_commit_phase2;
 use log::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-
+use tokio::time;
 use crate::utils::*;
 use async_trait::async_trait;
 use entity::resource_info as ResourceInfos;
@@ -64,9 +63,9 @@ impl Worker for LocalWorker {
                 futures::future::lazy(async move |_| {
                     info!("start task fetcher, wait for new task todo");
                     let mut un_complete_task_result = fetcher.fetch_uncompleted(worker_id.to_string()).await.unwrap();
-                    let ticker = tick(Duration::from_secs(10));
+                    let mut interval = time::interval(Duration::from_secs(10));
                     loop {
-                        ticker.recv().unwrap();
+                        interval.tick().await;
                         let cur_size = count_clone.load(Ordering::SeqCst);
                         if cur_size >= self.max_task {
                             warn!("has reach the max number of c2 tasks {} {}", cur_size, self.max_task);
