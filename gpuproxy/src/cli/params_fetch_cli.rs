@@ -1,4 +1,4 @@
-use crate::params_fetch;
+use crate::cli::params_fetch;
 use clap::{Arg, ArgMatches, Command};
 
 pub async fn fetch_params_cmds<'a>() -> Command<'a> {

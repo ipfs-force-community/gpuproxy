@@ -51,7 +51,7 @@ impl LocalWorker {
 
 #[async_trait]
 impl Worker for LocalWorker {
-    async  fn process_tasks(self) {
+    async fn process_tasks(self) {
         let (tx, mut rx) = channel(self.max_task);
         let fetcher = Arc::new(self.task_fetcher);
         let count = Arc::new(AtomicUsize::new(0));

@@ -16,7 +16,7 @@ use migration::{Migrator, MigratorTrait};
 
 #[tokio::main]
 async fn main() {
-    let worker_args = cli::worker::get_worker_arg();
+    let worker_args = cli::get_worker_arg();
     let app_m = Command::new("gpuproxy-worker")
         .version("0.0.1")
         .arg_required_else_help(true)
@@ -61,7 +61,7 @@ async fn main() {
 
     match app_m.subcommand() {
         Some(("run", ref sub_m)) => {
-            cli::worker::set_worker_env(sub_m);
+            cli::set_worker_env(sub_m);
 
             let url: String = sub_m.value_of_t("gpuproxy-url").unwrap_or_else(|e| e.exit());
             let max_c2: usize = sub_m.value_of_t("max-c2").unwrap_or_else(|e| e.exit());

@@ -19,9 +19,9 @@ use migration::{Migrator, MigratorTrait};
 
 #[tokio::main()]
 async fn main() {
-    let worker_args = cli::worker::get_worker_arg();
-    let list_task_cmds = cli::tasks::list_task_cmds().await;
-    let fetch_params_cmds = cli::params_fetch_cli::fetch_params_cmds().await;
+    let worker_args = cli::get_worker_arg();
+    let list_task_cmds = cli::list_task_cmds().await;
+    let fetch_params_cmds = cli::fetch_params_cmds().await;
     let app_m = Command::new("gpuproxy")
         .version("0.0.1")
         .args(&[
@@ -80,7 +80,7 @@ async fn main() {
 
     match app_m.subcommand() {
         Some(("run", ref sub_m)) => {
-            cli::worker::set_worker_env(sub_m);
+            cli::set_worker_env(sub_m);
 
             let url: String = sub_m.value_of_t("url").unwrap_or_else(|e| e.exit());
             let max_c2: usize = sub_m.value_of_t("max-c2").unwrap_or_else(|e| e.exit());
@@ -96,9 +96,9 @@ async fn main() {
 
             run_cfg(cfg).await;
         } // run was used
-        Some(("tasks", ref sub_m)) => cli::tasks::tasks_command(sub_m).await, // task was used
-        Some(("paramfetch", ref sub_m)) => cli::params_fetch_cli::fetch_params_command(sub_m).await, // run was used
-        _ => {}                                                               // Either no subcommand or one not tested for...
+        Some(("tasks", ref sub_m)) => cli::tasks_command(sub_m).await, // task was used
+        Some(("paramfetch", ref sub_m)) => cli::fetch_params_command(sub_m).await, // run was used
+        _ => {}                                                        // Either no subcommand or one not tested for...
     }
 }
 
@@ -138,7 +138,7 @@ async fn run_cfg(cfg: ServiceConfig) {
     info!("Shutting Down");
 } //run cfg
 
-async fn run_server(url:&str, module: RpcModule<ProxyImpl>) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
+async fn run_server(url: &str, module: RpcModule<ProxyImpl>) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
     let server = HttpServerBuilder::default().build(url.parse::<SocketAddr>()?)?;
 
     let addr = server.local_addr()?;

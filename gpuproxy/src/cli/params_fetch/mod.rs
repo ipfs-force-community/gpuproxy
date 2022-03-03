@@ -16,7 +16,7 @@ use storage_proofs_core::parameter_cache::{
 };
 use tar::Archive;
 
-const DEFAULT_JSON: &str = include_str!("./parameters.json");
+const DEFAULT_JSON: &str = include_str!("parameters.json");
 const DEFAULT_IPGET_VERSION: &str = "v0.6.0";
 
 #[inline]

@@ -8,7 +8,6 @@ extern crate scopeguard;
 
 pub mod cli;
 pub mod http_server;
-pub mod params_fetch;
 
 pub mod config;
 pub mod proxy_rpc;
