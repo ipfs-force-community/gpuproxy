@@ -46,7 +46,6 @@ uuid = { version = "0.8", features = ["v4", "v5"] }
 scopeguard = "1.1.0"
 tokio = { version = "1.8.0", features = ["full"] }
 tabled = { version = "*", features = ["color"] }
-num_enum = "0.5.6"
 
 # params fetch
 flate2 = "1.0.22"

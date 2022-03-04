@@ -14,7 +14,8 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-
+use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::ctrl_c;
 use migration::{Migrator, MigratorTrait};
 
 #[tokio::main()]
@@ -156,10 +157,19 @@ async fn run_cfg(cfg: ServiceConfig) {
         info!("ready for local worker address worker_id {}", worker_id);
     }
 
-    let (server_addr, _handle) = run_server(cfg.url.as_str(), rpc_module).await.unwrap();
+    let (server_addr, handle) = run_server(cfg.url.as_str(), rpc_module).await.unwrap();
     info!("starting listening {}", server_addr);
-    let () = futures::future::pending().await;
-    info!("Shutting Down");
+
+    let mut sig_int = signal(SignalKind::interrupt()).unwrap();
+    let mut sig_term = signal(SignalKind::terminate()).unwrap();
+
+    tokio::select! {
+        _ = sig_int.recv() => info!("receive SIGINT"),
+        _ = sig_term.recv() => info!("receive SIGTERM"),
+        _ = ctrl_c() => info!("receive Ctrl C"),
+    }
+    handle.stop().unwrap();
+    info!("Shutdown program");
 } //run cfg
 
 async fn run_server(
