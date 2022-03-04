@@ -8,15 +8,15 @@ use gpuproxy::proxy_rpc::*;
 use gpuproxy::resource;
 use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle, RpcModule};
 use log::*;
+use migration::{Migrator, MigratorTrait};
 use sea_orm::{ConnectOptions, Database};
 use simplelog::*;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::signal::unix::{signal, SignalKind};
 use tokio::signal::ctrl_c;
-use migration::{Migrator, MigratorTrait};
+use tokio::signal::unix::{signal, SignalKind};
 
 #[tokio::main()]
 async fn main() {

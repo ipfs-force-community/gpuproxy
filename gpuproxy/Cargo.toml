@@ -18,6 +18,10 @@ path = "src/gpuproxy/main.rs"
 name = "gpuproxy_worker"
 path = "src/gpuproxy_worker/main.rs"
 
+[[bin]]
+name = "cluster_c2_plugin"
+path = "src/cluster_c2_plugin/main.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -46,6 +50,7 @@ uuid = { version = "0.8", features = ["v4", "v5"] }
 scopeguard = "1.1.0"
 tokio = { version = "1.8.0", features = ["full"] }
 tabled = { version = "*", features = ["color"] }
+tracing = "0.1"
 
 # params fetch
 flate2 = "1.0.22"
@@ -71,3 +76,8 @@ features = [
     #"sqlx-postgres",
 ]
 default-features = false
+
+
+[dependencies.fil_types]
+version = "0.2"
+features = ["json"]

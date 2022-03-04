@@ -11,6 +11,8 @@ use sea_orm::Database;
 use simplelog::*;
 use std::str::FromStr;
 use std::sync::Arc;
+use tokio::signal::ctrl_c;
+use tokio::signal::unix::{signal, SignalKind};
 
 use migration::{Migrator, MigratorTrait};
 
@@ -110,8 +112,15 @@ async fn main() {
                 worker::LocalWorker::new(cfg.max_c2, worker_id.to_string(), resource, worker_api);
             worker.process_tasks().await;
             info!("ready for local worker address worker_id {}", worker_id);
-            let () = futures::future::pending().await;
-            info!("Shutting Down");
+            let mut sig_int = signal(SignalKind::interrupt()).unwrap();
+            let mut sig_term = signal(SignalKind::terminate()).unwrap();
+
+            tokio::select! {
+                _ = sig_int.recv() => info!("receive SIGINT"),
+                _ = sig_term.recv() => info!("receive SIGTERM"),
+                _ = ctrl_c() => info!("receive Ctrl C"),
+            }
+            info!("Shutdown program");
         } // run was used
         _ => {} // Either no subcommand or one not tested for...
     }
