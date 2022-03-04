@@ -43,7 +43,7 @@ func main() {
 	var proverId [32]byte
 	copy(proverId[:], commit2In.Miner.Payload())
 	rand.Seed(time.Now().Unix())
-	miner, _ := address.NewIDAddress(rand.Uint64())
+	miner, _ := address.NewIDAddress(uint64(rand.Uint32()))
 	taskId, err := client.SubmitC2Task(commit2In.Phase1Out, miner.String(), proverId, commit2In.SectorNum)
 	if err != nil {
 		log.Fatal(err)

@@ -10,9 +10,19 @@ use std::fmt;
 /// 2 Running task has fetched by worker by not completed
 /// 3 Error have error while running this task
 /// 4 Completed task has been calculated
-#[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(i32)]
-#[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr, EnumIter, DeriveActiveEnum)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    IntoPrimitive,
+    TryFromPrimitive,
+    Serialize_repr,
+    Deserialize_repr,
+    EnumIter,
+    DeriveActiveEnum,
+)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum TaskState {
     #[sea_orm(num_value = 0)]
@@ -34,9 +44,19 @@ impl fmt::Display for TaskState {
 }
 
 /// The type of task, only c2 task supported for now
-#[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(i32)]
-#[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr, EnumIter, DeriveActiveEnum)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    IntoPrimitive,
+    TryFromPrimitive,
+    Serialize_repr,
+    Deserialize_repr,
+    EnumIter,
+    DeriveActiveEnum,
+)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum TaskType {
     #[sea_orm(num_value = 0)]

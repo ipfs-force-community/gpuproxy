@@ -89,6 +89,39 @@ pub struct ProxyImpl {
     pool: Arc<dyn DbOp + Send + Sync>,
 }
 
+impl ProxyImpl {
+    async fn add_task_inner(
+        &self,
+        addr: forest_address::Address,
+        task_type: TaskType,
+        resource_bytes: Vec<u8>,
+    ) -> RpcResult<String> {
+        let resource_id = Uuid::new_v5(&Uuid::NAMESPACE_OID, &resource_bytes).to_string();
+        if !self.resource.has_resource(resource_id.clone()).await? {
+            let _ = self
+                .resource
+                .store_resource_info(resource_id.clone(), resource_bytes)
+                .await
+                .internal_call_error()?;
+        }
+
+        let mut buf = bytes::BytesMut::new();
+        buf.put_slice(&addr.payload_bytes());
+        buf.put_i32(task_type.into());
+        buf.put_slice(resource_id.clone().as_bytes());
+        let task_id = Uuid::new_v5(&Uuid::NAMESPACE_OID, buf.as_ref()).to_string();
+
+        if !self.pool.has_task(task_id.clone()).await? {
+            self.pool
+                .clone()
+                .add_task(task_id.clone(), addr, task_type, resource_id)
+                .await
+                .internal_call_error()?;
+        }
+        Ok(task_id)
+    }
+}
+
 #[async_trait]
 impl ProxyRpcServer for ProxyImpl {
     /// Submit C2 task this api if used for golang, compatable with Goland invoke parameters and return
@@ -107,30 +140,11 @@ impl ProxyRpcServer for ProxyImpl {
             sector_id: SectorId::from(sector_id),
             c1out: scp1o,
         };
+
         let resource_bytes = serde_json::to_vec(&c2_resource).invalid_params()?;
-        let resource_id = Uuid::new_v5(&Uuid::NAMESPACE_OID, &resource_bytes).to_string();
-        if !self.resource.has_resource(resource_id.clone()).await? {
-            let _ = self
-                .resource
-                .store_resource_info(resource_id.clone(), resource_bytes)
-                .await
-                .internal_call_error()?;
-        }
 
-        let mut buf = bytes::BytesMut::new();
-        buf.put_slice(&addr.payload_bytes());
-        buf.put_i32(TaskType::C2.into());
-        buf.put_slice(resource_id.clone().as_bytes());
-        let task_id = Uuid::new_v5(&Uuid::NAMESPACE_OID, buf.as_ref()).to_string();
-
-        if !self.pool.has_task(task_id.clone()).await? {
-            self.pool
-                .clone()
-                .add_task(task_id.clone(), addr, TaskType::C2, resource_id)
-                .await
-                .internal_call_error()?;
-        }
-        Ok(task_id)
+        self.add_task_inner(addr, TaskType::C2, resource_bytes)
+            .await
     }
 
     /// Add specify task into gpuproxy, params must be base64 encoded bytes
@@ -148,22 +162,7 @@ impl ProxyRpcServer for ProxyImpl {
             }
         }
 
-        let resource_id = uuid::Uuid::new_v5(&Uuid::NAMESPACE_OID, &param.0).to_string();
-        let _ = self
-            .resource
-            .store_resource_info(resource_id.clone(), param.0)
-            .await
-            .internal_call_error()?;
-
-        let mut buf = bytes::BytesMut::new();
-        buf.put_slice(&addr.payload_bytes());
-        buf.put_i32(TaskType::C2.into());
-        buf.put_slice(resource_id.clone().as_bytes());
-        let task_id = Uuid::new_v5(&Uuid::NAMESPACE_OID, buf.as_ref()).to_string();
-        self.pool
-            .add_task(task_id, addr, TaskType::C2, resource_id)
-            .await
-            .internal_call_error()
+        self.add_task_inner(addr, task_type, param.0).await
     }
 
     /// Get task by id
