@@ -216,7 +216,6 @@ impl Common for DbOpsImpl {
 
     async fn has_task(&self, task_id: String) -> Result<bool> {
         Tasks::Entity::find()
-            .select_only()
             .filter(Tasks::Column::Id.eq(task_id.clone()))
             .count(&self.conn)
             .await
@@ -286,7 +285,6 @@ impl Common for DbOpsImpl {
 impl Resource for DbOpsImpl {
     async fn has_resource(&self, resource_id: String) -> Result<bool> {
         ResourceInfos::Entity::find()
-            .select_only()
             .filter(ResourceInfos::Column::Id.eq(resource_id))
             .count(&self.conn)
             .await

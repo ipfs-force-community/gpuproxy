@@ -166,9 +166,7 @@ async fn run_server(
     url: &str,
     module: RpcModule<ProxyImpl>,
 ) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
-    let server = HttpServerBuilder::default()
-        .max_request_body_size(1024 * 1024 * 1024)
-        .build(url.parse::<SocketAddr>()?)?;
+    let server = HttpServerBuilder::default().build(url.parse::<SocketAddr>()?)?;
 
     let addr = server.local_addr()?;
     let server_handle = server.start(module)?;
