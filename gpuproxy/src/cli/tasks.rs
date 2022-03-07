@@ -5,7 +5,8 @@ use std::rc::Rc;
 use crate::proxy_rpc::rpc::{get_proxy_api, GpuServiceRpcClient};
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone, Utc};
 use clap::{Arg, ArgMatches, Command};
-use entity::tasks::{Model as Task, TaskState};
+use entity::tasks::Model as Task;
+use entity::{TaskState, TaskType};
 use tabled::{builder::Builder, Style};
 
 pub async fn list_task_cmds<'a>() -> Command<'a> {

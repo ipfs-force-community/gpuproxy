@@ -1,7 +1,7 @@
 use crate::db_ops::*;
 use crate::worker::Worker;
 use clap::{Arg, Command};
-use entity::tasks::TaskType;
+use entity::TaskType;
 use gpuproxy::cli;
 use gpuproxy::config::*;
 use gpuproxy::proxy_rpc::rpc::ProxyImpl;

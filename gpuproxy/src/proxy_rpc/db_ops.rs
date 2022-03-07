@@ -13,7 +13,7 @@ use crate::utils::Base64Byte;
 use crate::utils::*;
 use anyhow::{anyhow, Result};
 use chrono::Utc;
-use entity::tasks::{TaskState, TaskType};
+use entity::{TaskState, TaskType};
 use log::info;
 use uuid::Uuid;
 
@@ -35,7 +35,7 @@ pub trait WorkerFetch {
     async fn fetch_one_todo(
         &self,
         worker_id_arg: String,
-        types: Option<Vec<entity::tasks::TaskType>>,
+        types: Option<Vec<entity::TaskType>>,
     ) -> Result<Task>;
     async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>>;
     async fn record_error(
@@ -73,7 +73,7 @@ pub trait Common {
     async fn list_task(
         &self,
         worker_id_arg: Option<String>,
-        state: Option<Vec<entity::tasks::TaskState>>,
+        state: Option<Vec<entity::TaskState>>,
     ) -> Result<Vec<Task>>;
 }
 
@@ -116,7 +116,7 @@ impl WorkerFetch for DbOpsImpl {
     async fn fetch_one_todo(
         &self,
         worker_id_arg: String,
-        types: Option<Vec<entity::tasks::TaskType>>,
+        types: Option<Vec<entity::TaskType>>,
     ) -> Result<Task> {
         let mut query = Tasks::Entity::find().filter(Tasks::Column::State.eq(TaskState::Init));
 
@@ -278,7 +278,7 @@ impl Common for DbOpsImpl {
     async fn list_task(
         &self,
         worker_id_opt: Option<String>,
-        state_cod: Option<Vec<entity::tasks::TaskState>>,
+        state_cod: Option<Vec<entity::TaskState>>,
     ) -> Result<Vec<Task>> {
         let mut query = Tasks::Entity::find();
         if let Some(worker_id_arg) = worker_id_opt {

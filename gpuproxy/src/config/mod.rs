@@ -1,4 +1,4 @@
-use entity::tasks::TaskType;
+use entity::TaskType;
 
 /// Resource type, there are 2 resource type for now,
 /// this first is db resource that save task parameters in database,

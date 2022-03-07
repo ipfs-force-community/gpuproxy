@@ -14,7 +14,7 @@ use storage_proofs_core::sector::SectorId;
 use tokio::time;
 use tokio::time::Duration;
 
-use entity::tasks::{TaskState, TaskType};
+use entity::{TaskState, TaskType};
 use fil_types::ActorID;
 use gpuproxy::proxy_rpc::rpc::get_proxy_api;
 use gpuproxy::utils::Base64Byte;

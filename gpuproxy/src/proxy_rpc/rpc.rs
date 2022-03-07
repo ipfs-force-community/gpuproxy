@@ -7,10 +7,10 @@ use crate::utils::Base64Byte;
 use crate::utils::{IntoAnyhow, IntoJsonRpcResult, ReveseOption};
 use anyhow::anyhow;
 use bytes::BufMut;
-use entity::resource_info as ResourceInfos;
 use entity::tasks as Tasks;
-use entity::tasks::TaskType;
 use entity::worker_info as WorkerInfos;
+use entity::TaskType;
+use entity::{resource_info as ResourceInfos, TaskState};
 use jsonrpsee::core::{async_trait, client::Subscription, RpcResult};
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use jsonrpsee::proc_macros::rpc;
@@ -37,7 +37,7 @@ pub trait ProxyRpc {
     async fn add_task(
         &self,
         miner: String,
-        task_type: entity::tasks::TaskType,
+        task_type: entity::TaskType,
         param: Base64Byte,
     ) -> RpcResult<String>;
 
@@ -48,7 +48,7 @@ pub trait ProxyRpc {
     async fn fetch_todo(
         &self,
         worker_id_arg: String,
-        types: Option<Vec<entity::tasks::TaskType>>,
+        types: Option<Vec<entity::TaskType>>,
     ) -> RpcResult<Task>;
 
     #[method(name = "Proof.FetchUncomplete")]
@@ -77,14 +77,14 @@ pub trait ProxyRpc {
     async fn list_task(
         &self,
         worker_id_arg: Option<String>,
-        state: Option<Vec<entity::tasks::TaskState>>,
+        state: Option<Vec<entity::TaskState>>,
     ) -> RpcResult<Vec<Task>>;
 
     #[method(name = "Proof.UpdateStatusById")]
     async fn update_status_by_id(
         &self,
         tids: Vec<String>,
-        status: entity::tasks::TaskState,
+        status: entity::TaskState,
     ) -> RpcResult<bool>;
 }
 
@@ -178,7 +178,7 @@ impl ProxyRpcServer for ProxyImpl {
     async fn fetch_todo(
         &self,
         worker_id_arg: String,
-        types: Option<Vec<entity::tasks::TaskType>>,
+        types: Option<Vec<entity::TaskType>>,
     ) -> RpcResult<Task> {
         self.pool
             .fetch_one_todo(worker_id_arg, types)
@@ -232,7 +232,7 @@ impl ProxyRpcServer for ProxyImpl {
     async fn list_task(
         &self,
         worker_id_arg: Option<String>,
-        state: Option<Vec<entity::tasks::TaskState>>,
+        state: Option<Vec<entity::TaskState>>,
     ) -> RpcResult<Vec<Task>> {
         self.pool
             .list_task(worker_id_arg, state)
@@ -244,7 +244,7 @@ impl ProxyRpcServer for ProxyImpl {
     async fn update_status_by_id(
         &self,
         tids: Vec<String>,
-        state: entity::tasks::TaskState,
+        state: entity::TaskState,
     ) -> RpcResult<bool> {
         self.pool
             .update_status_by_id(tids, state)
@@ -298,7 +298,7 @@ impl WorkerFetch for WrapClient {
     async fn fetch_one_todo(
         &self,
         worker_id: String,
-        types: Option<Vec<entity::tasks::TaskType>>,
+        types: Option<Vec<entity::TaskType>>,
     ) -> anyhow::Result<Task> {
         self.client.fetch_todo(worker_id, types).await.anyhow()
     }
@@ -356,7 +356,7 @@ pub trait GpuServiceRpcClient {
     async fn fetch_todo(
         &self,
         worker_id_arg: String,
-        types: Option<Vec<entity::tasks::TaskType>>,
+        types: Option<Vec<entity::TaskType>>,
     ) -> anyhow::Result<Task>;
 
     async fn fetch_uncompleted(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>>;
@@ -380,13 +380,13 @@ pub trait GpuServiceRpcClient {
     async fn list_task(
         &self,
         worker_id_arg: Option<String>,
-        state: Option<Vec<entity::tasks::TaskState>>,
+        state: Option<Vec<entity::TaskState>>,
     ) -> anyhow::Result<Vec<Task>>;
 
     async fn update_status_by_id(
         &self,
         tids: Vec<String>,
-        state: entity::tasks::TaskState,
+        state: entity::TaskState,
     ) -> anyhow::Result<bool>;
 }
 
@@ -421,7 +421,7 @@ impl GpuServiceRpcClient for WrapClient {
     async fn fetch_todo(
         &self,
         worker_id_arg: String,
-        types: Option<Vec<entity::tasks::TaskType>>,
+        types: Option<Vec<entity::TaskType>>,
     ) -> anyhow::Result<Task> {
         self.client.fetch_todo(worker_id_arg, types).await.anyhow()
     }
@@ -464,7 +464,7 @@ impl GpuServiceRpcClient for WrapClient {
     async fn list_task(
         &self,
         worker_id_arg: Option<String>,
-        state: Option<Vec<entity::tasks::TaskState>>,
+        state: Option<Vec<entity::TaskState>>,
     ) -> anyhow::Result<Vec<Task>> {
         self.client.list_task(worker_id_arg, state).await.anyhow()
     }
@@ -472,7 +472,7 @@ impl GpuServiceRpcClient for WrapClient {
     async fn update_status_by_id(
         &self,
         tids: Vec<String>,
-        state: entity::tasks::TaskState,
+        state: entity::TaskState,
     ) -> anyhow::Result<bool> {
         self.client.update_status_by_id(tids, state).await.anyhow()
     }
