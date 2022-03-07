@@ -26,16 +26,17 @@ pub async fn list_task_cmds<'a>() -> Command<'a> {
             Command::new("update-state")
                 .about("update status of task")
                 .args(&[
-                    Arg::new("state")
-                        .long("state")
+                    Arg::new("id")
+                        .long("id")
                         .multiple_values(true)
                         .takes_value(true)
                         .required(true)
-                        .help("Init = 1\nRunning = 2\nError = 3\nCompleted = 4"),
-                    Arg::new("id")
-                        .long("id")
-                        .required(true)
                         .help("id slice of id"),
+                    Arg::new("state")
+                        .long("state")
+                        .required(true)
+                        .takes_value(true)
+                        .help("Init = 1\nRunning = 2\nError = 3\nCompleted = 4"),
                 ]),
         )
 }
