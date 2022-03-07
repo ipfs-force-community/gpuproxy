@@ -45,7 +45,11 @@ pub trait ProxyRpc {
     async fn get_task(&self, id: String) -> RpcResult<Task>;
 
     #[method(name = "Proof.FetchTodo")]
-    async fn fetch_todo(&self, worker_id_arg: String) -> RpcResult<Task>;
+    async fn fetch_todo(
+        &self,
+        worker_id_arg: String,
+        types: Option<Vec<entity::tasks::TaskType>>,
+    ) -> RpcResult<Task>;
 
     #[method(name = "Proof.FetchUncomplete")]
     async fn fetch_uncompleted(&self, worker_id_arg: String) -> RpcResult<Vec<Task>>;
@@ -171,9 +175,13 @@ impl ProxyRpcServer for ProxyImpl {
     }
 
     /// Fetch a undo task and mark it to running
-    async fn fetch_todo(&self, worker_id_arg: String) -> RpcResult<Task> {
+    async fn fetch_todo(
+        &self,
+        worker_id_arg: String,
+        types: Option<Vec<entity::tasks::TaskType>>,
+    ) -> RpcResult<Task> {
         self.pool
-            .fetch_one_todo(worker_id_arg)
+            .fetch_one_todo(worker_id_arg, types)
             .await
             .internal_call_error()
     }
@@ -287,8 +295,12 @@ impl resource::Resource for WrapClient {
 
 #[async_trait]
 impl WorkerFetch for WrapClient {
-    async fn fetch_one_todo(&self, worker_id: String) -> anyhow::Result<Task> {
-        self.client.fetch_todo(worker_id).await.anyhow()
+    async fn fetch_one_todo(
+        &self,
+        worker_id: String,
+        types: Option<Vec<entity::tasks::TaskType>>,
+    ) -> anyhow::Result<Task> {
+        self.client.fetch_todo(worker_id, types).await.anyhow()
     }
 
     async fn fetch_uncompleted(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>> {
@@ -341,7 +353,11 @@ pub trait GpuServiceRpcClient {
 
     async fn get_task(&self, id: String) -> anyhow::Result<Task>;
 
-    async fn fetch_todo(&self, worker_id_arg: String) -> anyhow::Result<Task>;
+    async fn fetch_todo(
+        &self,
+        worker_id_arg: String,
+        types: Option<Vec<entity::tasks::TaskType>>,
+    ) -> anyhow::Result<Task>;
 
     async fn fetch_uncompleted(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>>;
 
@@ -402,8 +418,12 @@ impl GpuServiceRpcClient for WrapClient {
         self.client.get_task(id).await.anyhow()
     }
 
-    async fn fetch_todo(&self, worker_id_arg: String) -> anyhow::Result<Task> {
-        self.client.fetch_todo(worker_id_arg).await.anyhow()
+    async fn fetch_todo(
+        &self,
+        worker_id_arg: String,
+        types: Option<Vec<entity::tasks::TaskType>>,
+    ) -> anyhow::Result<Task> {
+        self.client.fetch_todo(worker_id_arg, types).await.anyhow()
     }
 
     async fn fetch_uncompleted(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>> {

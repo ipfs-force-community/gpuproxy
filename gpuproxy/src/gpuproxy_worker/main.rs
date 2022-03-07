@@ -2,19 +2,19 @@ use crate::db_ops::*;
 use crate::worker::Worker;
 
 use clap::{Arg, Command};
+use entity::tasks::TaskType;
 use gpuproxy::cli;
 use gpuproxy::config::*;
 use gpuproxy::proxy_rpc::*;
 use gpuproxy::resource;
 use log::*;
+use migration::{Migrator, MigratorTrait};
 use sea_orm::Database;
 use simplelog::*;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::signal::ctrl_c;
 use tokio::signal::unix::{signal, SignalKind};
-
-use migration::{Migrator, MigratorTrait};
 
 #[tokio::main]
 async fn main() {
@@ -36,9 +36,9 @@ async fn main() {
                         .env("C2PROXY_DSN")
                         .default_value("sqlite://gpuproxy-worker.db")
                         .help("specify sqlite path to store task"),
-                    Arg::new("max-c2")
-                        .long("max-c2")
-                        .env("C2PROXY_MAX_C2")
+                    Arg::new("max-tasks")
+                        .long("max-tasks")
+                        .env("C2PROXY_MAX_TASKS")
                         .default_value("1")
                         .help("number of c2 task to run parallelly"),
                     Arg::new("log-level")
@@ -56,6 +56,11 @@ async fn main() {
                         .env("./tar")
                         .default_value("")
                         .help("when resource type is fs, will use this path to read resource"),
+                    Arg::new("task-type")
+                        .long("task-type")
+                        .multiple_values(true)
+                        .takes_value(true)
+                        .help("task types that worker support (c2 = 0)"),
                 ])
                 .args(worker_args),
         )
@@ -68,7 +73,7 @@ async fn main() {
             let url: String = sub_m
                 .value_of_t("gpuproxy-url")
                 .unwrap_or_else(|e| e.exit());
-            let max_c2: usize = sub_m.value_of_t("max-c2").unwrap_or_else(|e| e.exit());
+            let max_tasks: usize = sub_m.value_of_t("max-tasks").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
             let log_level: String = sub_m.value_of_t("log-level").unwrap_or_else(|e| e.exit());
             let resource_type: String = sub_m
@@ -77,14 +82,26 @@ async fn main() {
             let fs_resource_type: String = sub_m
                 .value_of_t("fs-resource-path")
                 .unwrap_or_else(|e| e.exit());
+            let task_types = if sub_m.is_present("task-type") {
+                let values = sub_m
+                    .values_of_t::<i32>("task-type")
+                    .unwrap_or_else(|e| e.exit())
+                    .into_iter()
+                    .map(|e| TaskType::try_from(e).unwrap())
+                    .collect();
+                Some(values)
+            } else {
+                None
+            };
 
             let cfg = WorkerConfig::new(
                 url,
                 db_dsn,
-                max_c2,
+                max_tasks,
                 resource_type,
                 fs_resource_type,
                 log_level,
+                task_types,
             );
 
             let lv = LevelFilter::from_str(cfg.log_level.as_str()).unwrap();
@@ -108,8 +125,13 @@ async fn main() {
                 Resource::FS(path) => Arc::new(resource::FileResource::new(path)),
             };
 
-            let worker =
-                worker::LocalWorker::new(cfg.max_c2, worker_id.to_string(), resource, worker_api);
+            let worker = worker::LocalWorker::new(
+                cfg.max_tasks,
+                worker_id.to_string(),
+                cfg.task_types,
+                resource,
+                worker_api,
+            );
             worker.process_tasks().await;
             info!("ready for local worker address worker_id {}", worker_id);
             let mut sig_int = signal(SignalKind::interrupt()).unwrap();

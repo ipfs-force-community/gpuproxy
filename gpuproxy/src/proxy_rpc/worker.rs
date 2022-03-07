@@ -30,12 +30,14 @@ pub struct LocalWorker {
     pub max_task: usize,
     pub task_fetcher: Arc<dyn WorkerFetch + Send + Sync>,
     pub resource: Arc<dyn Resource + Send + Sync>,
+    pub allow_types: Option<Vec<TaskType>>,
 }
 
 impl LocalWorker {
     pub fn new(
         max_task: usize,
         worker_id: String,
+        allow_types: Option<Vec<TaskType>>,
         resource: Arc<dyn Resource + Send + Sync>,
         task_fetcher: Arc<dyn WorkerFetch + Send + Sync>,
     ) -> Self {
@@ -44,6 +46,7 @@ impl LocalWorker {
             max_task,
             task_fetcher,
             resource,
+            allow_types,
         }
     }
 }
@@ -82,7 +85,10 @@ impl Worker for LocalWorker {
                         if un_complete_task_result.len() > 0 {
                             select_task = un_complete_task_result.pop().unwrap();
                         } else {
-                            match fetcher.fetch_one_todo(worker_id.clone()).await {
+                            match fetcher
+                                .fetch_one_todo(worker_id.clone(), self.allow_types.clone())
+                                .await
+                            {
                                 Ok(v) => {
                                     select_task = v;
                                 }

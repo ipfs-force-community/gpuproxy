@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use std::rc::Rc;
 
 use crate::proxy_rpc::rpc::{get_proxy_api, GpuServiceRpcClient};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Local, NaiveDateTime, TimeZone, Utc};
 use clap::{Arg, ArgMatches, Command};
 use entity::tasks::{Model as Task, TaskState};
 use tabled::{builder::Builder, Style};
@@ -16,26 +16,45 @@ pub async fn list_task_cmds<'a>() -> Command<'a> {
             Command::new("list")
                 .about("list task status")
                 .args(&[Arg::new("state")
-                    .long("task-state")
+                    .long("state")
                     .multiple_values(true)
                     .takes_value(true)
                     .help("Init = 1\nRunning = 2\nError = 3\nCompleted = 4")]),
         )
+        .subcommand(
+            Command::new("update-state")
+                .about("update status of task")
+                .args(&[
+                    Arg::new("state")
+                        .long("state")
+                        .multiple_values(true)
+                        .takes_value(true)
+                        .required(true)
+                        .help("Init = 1\nRunning = 2\nError = 3\nCompleted = 4"),
+                    Arg::new("id")
+                        .long("id")
+                        .required(true)
+                        .help("id slice of id"),
+                ]),
+        )
 }
 pub async fn tasks_command(task_m: &&ArgMatches) {
     match task_m.subcommand() {
-        Some(("list", ref _sub_m)) => {
-            list_tasks(_sub_m).await;
+        Some(("list", ref sub_m)) => {
+            list_tasks(sub_m).await;
+        } // run was used
+        Some(("update-state", ref sub_m)) => {
+            update_status_by_id(sub_m).await;
         } // run was used
         _ => {}
     }
 }
 
-pub async fn list_tasks(_sub_m: &&ArgMatches) {
-    let url: String = _sub_m.value_of_t("url").unwrap_or_else(|e| e.exit());
+pub async fn list_tasks(sub_m: &&ArgMatches) {
+    let url: String = sub_m.value_of_t("url").unwrap_or_else(|e| e.exit());
 
-    let states = if _sub_m.is_present("state") {
-        let values = _sub_m
+    let states = if sub_m.is_present("state") {
+        let values = sub_m
             .values_of_t::<i32>("state")
             .unwrap_or_else(|e| e.exit())
             .into_iter()
@@ -48,6 +67,26 @@ pub async fn list_tasks(_sub_m: &&ArgMatches) {
     let worker_api = get_proxy_api(url).await.unwrap();
     let tasks = worker_api.list_task(None, states).await.unwrap();
     print_task(tasks);
+}
+
+pub async fn update_status_by_id(sub_m: &&ArgMatches) {
+    let url: String = sub_m.value_of_t("url").unwrap_or_else(|e| e.exit());
+
+    let ids = sub_m
+        .values_of_t::<String>("id")
+        .unwrap_or_else(|e| e.exit())
+        .into_iter()
+        .collect();
+
+    let state = sub_m
+        .value_of_t::<i32>("state")
+        .map(|e| TaskState::try_from(e).unwrap())
+        .unwrap_or_else(|e| e.exit());
+
+    let worker_api = get_proxy_api(url).await.unwrap();
+    if worker_api.update_status_by_id(ids, state).await.unwrap() {
+        println!("update state success");
+    }
 }
 
 fn print_task(tasks: Vec<Task>) {
@@ -81,19 +120,9 @@ fn print_task(tasks: Vec<Task>) {
     println!("{}", table);
 }
 
-/*pub async fn update_status_by_id(task_m: &&ArgMatches) {
-    let url: String = task_m.value_of_t("url").unwrap_or_else(|e| e.exit());
-
-    let worker_api = get_proxy_api(url).await.unwrap();
-    if worker_api.update_status_by_id(ids, state).await.unwrap(){
-        println!("update state success");
-    }
-}*/
-
 fn print_timestamp(tm: i64) -> String {
     if tm <= 0 {
         return "".to_string();
     }
-    let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(tm, 0), Utc);
-    dt.naive_local().to_string()
+    Local.timestamp(tm, 0).to_string()
 }

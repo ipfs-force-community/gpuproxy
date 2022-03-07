@@ -32,7 +32,11 @@ pub trait WorkerApi {
 
 #[async_trait]
 pub trait WorkerFetch {
-    async fn fetch_one_todo(&self, worker_id_arg: String) -> Result<Task>;
+    async fn fetch_one_todo(
+        &self,
+        worker_id_arg: String,
+        types: Option<Vec<entity::tasks::TaskType>>,
+    ) -> Result<Task>;
     async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>>;
     async fn record_error(
         &self,
@@ -109,11 +113,18 @@ impl WorkerApi for DbOpsImpl {
 
 #[async_trait]
 impl WorkerFetch for DbOpsImpl {
-    async fn fetch_one_todo(&self, worker_id_arg: String) -> Result<Task> {
-        let undo_task_opt: Option<Task> = Tasks::Entity::find()
-            .filter(Tasks::Column::State.eq(TaskState::Init))
-            .one(&self.conn)
-            .await?;
+    async fn fetch_one_todo(
+        &self,
+        worker_id_arg: String,
+        types: Option<Vec<entity::tasks::TaskType>>,
+    ) -> Result<Task> {
+        let mut query = Tasks::Entity::find().filter(Tasks::Column::State.eq(TaskState::Init));
+
+        if let Some(state_arg) = types {
+            query = query.filter(Tasks::Column::TaskType.is_in(state_arg));
+        }
+
+        let undo_task_opt: Option<Task> = query.one(&self.conn).await.anyhow()?;
         if let Some(undo_task) = undo_task_opt {
             let mut undo_task_active: Tasks::ActiveModel = undo_task.into();
             undo_task_active.state = Set(TaskState::Running);

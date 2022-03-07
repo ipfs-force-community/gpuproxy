@@ -1,6 +1,7 @@
 use crate::db_ops::*;
 use crate::worker::Worker;
 use clap::{Arg, Command};
+use entity::tasks::TaskType;
 use gpuproxy::cli;
 use gpuproxy::config::*;
 use gpuproxy::proxy_rpc::rpc::ProxyImpl;
@@ -50,11 +51,11 @@ async fn main() {
                         .env("C2PROXY_DSN")
                         .default_value("sqlite://gpuproxy.db")
                         .help("specify sqlite path to store task"),
-                    Arg::new("max-c2")
-                        .long("max-c2")
-                        .env("C2PROXY_MAX_C2")
+                    Arg::new("max-tasks")
+                        .long("max-tasks")
+                        .env("C2PROXY_MAX_TASKS")
                         .default_value("1")
-                        .help("number of c2 task to run parallelly"),
+                        .help("number of task to run parallelly"),
                     Arg::new("disable-worker")
                         .long("disable-worker")
                         .env("C2PROXY_DISABLE_WORKER")
@@ -72,6 +73,11 @@ async fn main() {
                         .env("C2PROXY_FS_RESOURCE_PATH")
                         .default_value("")
                         .help("when resource type is fs, will use this path to read resource"),
+                    Arg::new("task-type")
+                        .long("task-type")
+                        .multiple_values(true)
+                        .takes_value(true)
+                        .help("task types that worker support (c2 = 0)"),
                 ])
                 .args(worker_args),
         )
@@ -84,7 +90,7 @@ async fn main() {
             cli::set_worker_env(sub_m);
 
             let url: String = sub_m.value_of_t("url").unwrap_or_else(|e| e.exit());
-            let max_c2: usize = sub_m.value_of_t("max-c2").unwrap_or_else(|e| e.exit());
+            let max_tasks: usize = sub_m.value_of_t("max-tasks").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
             let log_level: String = sub_m.value_of_t("log-level").unwrap_or_else(|e| e.exit());
             let resource_type: String = sub_m
@@ -96,14 +102,27 @@ async fn main() {
             let disable_worker: bool = sub_m
                 .value_of_t("disable-worker")
                 .unwrap_or_else(|e| e.exit());
+            let task_types = if sub_m.is_present("task-type") {
+                let values = sub_m
+                    .values_of_t::<i32>("task-type")
+                    .unwrap_or_else(|e| e.exit())
+                    .into_iter()
+                    .map(|e| TaskType::try_from(e).unwrap())
+                    .collect();
+                Some(values)
+            } else {
+                None
+            };
+
             let cfg = ServiceConfig::new(
                 url,
                 db_dsn,
-                max_c2,
+                max_tasks,
                 disable_worker,
                 resource_type,
                 fs_resource_type,
                 log_level.clone(),
+                task_types,
             );
 
             let lv = LevelFilter::from_str(cfg.log_level.as_str()).unwrap();
@@ -145,8 +164,9 @@ async fn run_cfg(cfg: ServiceConfig) {
     };
 
     let worker = worker::LocalWorker::new(
-        cfg.max_c2,
+        cfg.max_tasks,
         worker_id.to_string(),
+        cfg.task_types,
         resource.clone(),
         arc_pool.clone(),
     );

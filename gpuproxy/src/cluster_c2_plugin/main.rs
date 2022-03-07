@@ -21,6 +21,11 @@ use gpuproxy::utils::Base64Byte;
 use serde::{Deserialize, Serialize};
 use tracing::info_span;
 
+struct C2PluginCfg {
+    url: String,
+    pool_task_interval: u64,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 /// inputs of stage c2
 pub struct C2Input {
@@ -55,6 +60,11 @@ async fn main() {
                         .env("C2PROXY_LISTEN_URL")
                         .default_value("http://127.0.0.1:18888")
                         .help("specify url for connect gpuproxy for get task to excute"),
+                    Arg::new("poll-task-interval")
+                        .long("poll-task-interval")
+                        .env("C2PROXY_POLL_TASK_INTERVAL")
+                        .default_value("60")
+                        .help("interval for pool task status from gpuproxy server"),
                     Arg::new("log-level")
                         .long("log-level")
                         .env("C2PROXY_LOG_LEVEL")
@@ -72,13 +82,21 @@ async fn main() {
             let url: String = sub_m
                 .value_of_t("gpuproxy-url")
                 .unwrap_or_else(|e| e.exit());
-            run(url).await.unwrap();
+            let interval: u64 = sub_m
+                .value_of_t("poll-task-interval")
+                .unwrap_or_else(|e| e.exit());
+
+            let cfg = C2PluginCfg {
+                url,
+                pool_task_interval: interval,
+            };
+            run(cfg).await.unwrap();
         } // run was used
         _ => {} // Either no subcommand or one not tested for...
     }
 }
 
-async fn run(url: String) -> Result<()> {
+async fn run(cfg: C2PluginCfg) -> Result<()> {
     let c2_stage_name = "c2";
 
     let mut output = stdout();
@@ -91,14 +109,14 @@ async fn run(url: String) -> Result<()> {
     let mut line = String::new();
     let input = stdin();
 
-    info!("processor ready");
+    info!("stage {}, pid {} processor ready", c2_stage_name, pid);
     loop {
         debug!("waiting for new incoming line");
         input.read_line(&mut line)?;
         trace!("line: {}", line.as_str());
 
         debug!("process line");
-        let response = match process_line(&url, line.as_str()).await {
+        let response = match process_line(&cfg, line.as_str()).await {
             Ok(o) => Response {
                 err_msg: None,
                 result: Some(o),
@@ -119,14 +137,14 @@ async fn run(url: String) -> Result<()> {
     }
 }
 
-async fn process_line(url: &str, line: &str) -> Result<SealCommitPhase2Output> {
+async fn process_line(cfg: &C2PluginCfg, line: &str) -> Result<SealCommitPhase2Output> {
     let input: C2Input = from_str(line)?;
     trace!("input: {:?}", input);
 
     let params = Base64Byte(serde_json::to_vec(&input)?);
     let miner_addr = forest_address::Address::new_id(input.miner_id).to_string();
 
-    let proxy_client = get_proxy_api(url.to_string()).await?;
+    let proxy_client = get_proxy_api(cfg.url.clone()).await?;
     let task_id = proxy_client
         .add_task(miner_addr, TaskType::C2, params)
         .await?;
@@ -135,24 +153,24 @@ async fn process_line(url: &str, line: &str) -> Result<SealCommitPhase2Output> {
         "miner_id {} submit task {} successfully",
         input.miner_id, task_id
     );
+
+    let duration = Duration::from_secs(cfg.pool_task_interval);
     loop {
-        let mut interval = time::interval(Duration::from_secs(10));
-        loop {
-            interval.tick().await;
-            let task = proxy_client.get_task(task_id.clone()).await?;
-            if task.state == TaskState::Error {
-                //发生错误 退出当前执行的任务
-                return Err(anyhow!(
-                    "got task error while excuting task reason:{}",
-                    task.error_msg
-                ));
-            } else if task.state == TaskState::Completed {
-                return Ok(SealCommitPhase2Output {
-                    proof: base64::decode(task.proof)?,
-                });
-            } else {
-                continue;
-            }
+        let mut interval = time::interval(duration);
+        interval.tick().await;
+        let task = proxy_client.get_task(task_id.clone()).await?;
+        if task.state == TaskState::Error {
+            //发生错误 退出当前执行的任务
+            return Err(anyhow!(
+                "got task error while excuting task reason:{}",
+                task.error_msg
+            ));
+        } else if task.state == TaskState::Completed {
+            return Ok(SealCommitPhase2Output {
+                proof: base64::decode(task.proof)?,
+            });
+        } else {
+            continue;
         }
     }
 }
