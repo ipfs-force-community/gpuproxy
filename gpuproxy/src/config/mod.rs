@@ -16,7 +16,7 @@ pub struct ServiceConfig {
     pub db_dsn: String,
     pub disable_worker: bool,
     pub max_tasks: usize,
-    pub task_types: Option<Vec<TaskType>>,
+    pub allow_types: Option<Vec<TaskType>>,
 
     pub log_level: String,
     pub resource: Resource,
@@ -31,7 +31,7 @@ impl ServiceConfig {
         resource_type: String,
         resource_path: String,
         log_level: String,
-        task_types: Option<Vec<TaskType>>,
+        allow_types: Option<Vec<TaskType>>,
     ) -> Self {
         let resource = if resource_type == "db" {
             Resource::Db
@@ -46,7 +46,7 @@ impl ServiceConfig {
             disable_worker,
             log_level,
             resource,
-            task_types,
+            allow_types,
         }
     }
 }
@@ -57,7 +57,7 @@ pub struct WorkerConfig {
     pub url: String,
     pub db_dsn: String,
     pub max_tasks: usize,
-    pub task_types: Option<Vec<TaskType>>,
+    pub allow_types: Option<Vec<TaskType>>,
 
     pub log_level: String,
     pub resource: Resource,
@@ -71,7 +71,7 @@ impl WorkerConfig {
         resource_type: String,
         resource_path: String,
         log_level: String,
-        task_types: Option<Vec<TaskType>>,
+        allow_types: Option<Vec<TaskType>>,
     ) -> Self {
         let resource = if resource_type == "db" {
             Resource::Db
@@ -84,7 +84,7 @@ impl WorkerConfig {
             max_tasks,
             resource,
             log_level,
-            task_types,
+            allow_types,
         }
     }
 }

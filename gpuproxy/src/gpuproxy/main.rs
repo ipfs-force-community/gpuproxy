@@ -73,8 +73,8 @@ async fn main() {
                         .env("C2PROXY_FS_RESOURCE_PATH")
                         .default_value("")
                         .help("when resource type is fs, will use this path to read resource"),
-                    Arg::new("task-type")
-                        .long("task-type")
+                    Arg::new("allow-type")
+                        .long("allow-type")
                         .multiple_values(true)
                         .takes_value(true)
                         .help("task types that worker support (c2 = 0)"),
@@ -102,9 +102,9 @@ async fn main() {
             let disable_worker: bool = sub_m
                 .value_of_t("disable-worker")
                 .unwrap_or_else(|e| e.exit());
-            let task_types = if sub_m.is_present("task-type") {
+            let allow_types = if sub_m.is_present("allow-type") {
                 let values = sub_m
-                    .values_of_t::<i32>("task-type")
+                    .values_of_t::<i32>("allow-type")
                     .unwrap_or_else(|e| e.exit())
                     .into_iter()
                     .map(|e| TaskType::try_from(e).unwrap())
@@ -122,7 +122,7 @@ async fn main() {
                 resource_type,
                 fs_resource_type,
                 log_level.clone(),
-                task_types,
+                allow_types,
             );
 
             let lv = LevelFilter::from_str(cfg.log_level.as_str()).unwrap();
@@ -166,7 +166,7 @@ async fn run_cfg(cfg: ServiceConfig) {
     let worker = worker::LocalWorker::new(
         cfg.max_tasks,
         worker_id.to_string(),
-        cfg.task_types,
+        cfg.allow_types,
         resource.clone(),
         arc_pool.clone(),
     );
