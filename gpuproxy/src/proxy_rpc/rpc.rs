@@ -22,6 +22,8 @@ use ResourceInfos::Model as ResourceInfo;
 use Tasks::Model as Task;
 use WorkerInfos::Model as WorkerInfo;
 
+pub const ONE_GIB: u32 = 1024 * 1024 * 1024;
+
 #[rpc(server, client)]
 pub trait ProxyRpc {
     #[method(name = "Proof.SubmitC2Task")]
@@ -265,6 +267,7 @@ pub fn register(
 /// get proxy api by url
 pub async fn get_proxy_api(url: String) -> anyhow::Result<WrapClient> {
     HttpClientBuilder::default()
+        .max_request_body_size(ONE_GIB)
         .build(url.as_str())
         .map(|val| WrapClient { client: val })
         .anyhow()

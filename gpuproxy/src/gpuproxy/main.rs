@@ -4,7 +4,7 @@ use clap::{Arg, Command};
 use entity::TaskType;
 use gpuproxy::cli;
 use gpuproxy::config::*;
-use gpuproxy::proxy_rpc::rpc::ProxyImpl;
+use gpuproxy::proxy_rpc::rpc::{ProxyImpl, ONE_GIB};
 use gpuproxy::proxy_rpc::*;
 use gpuproxy::resource;
 use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle, RpcModule};
@@ -18,8 +18,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::signal::ctrl_c;
 use tokio::signal::unix::{signal, SignalKind};
-
-const ONE_GIB: u32 = 1024*1024*1024;
 
 #[tokio::main()]
 async fn main() {
@@ -198,7 +196,9 @@ async fn run_server(
     url: &str,
     module: RpcModule<ProxyImpl>,
 ) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
-    let server = HttpServerBuilder::default().max_request_body_size(ONE_GIB).build(url.parse::<SocketAddr>()?)?;
+    let server = HttpServerBuilder::default()
+        .max_request_body_size(ONE_GIB)
+        .build(url.parse::<SocketAddr>()?)?;
 
     let addr = server.local_addr()?;
     let server_handle = server.start(module)?;
