@@ -19,6 +19,8 @@ use std::time::Duration;
 use tokio::signal::ctrl_c;
 use tokio::signal::unix::{signal, SignalKind};
 
+const ONE_GIB: u32 = 1024*1024*1024;
+
 #[tokio::main()]
 async fn main() {
     let worker_args = cli::get_worker_arg();
@@ -196,7 +198,7 @@ async fn run_server(
     url: &str,
     module: RpcModule<ProxyImpl>,
 ) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
-    let server = HttpServerBuilder::default().build(url.parse::<SocketAddr>()?)?;
+    let server = HttpServerBuilder::default().max_request_body_size(ONE_GIB).build(url.parse::<SocketAddr>()?)?;
 
     let addr = server.local_addr()?;
     let server_handle = server.start(module)?;
