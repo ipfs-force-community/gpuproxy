@@ -43,15 +43,15 @@ where
 
 /// this trait used in db ops, when query return Option<T>, convert to Result<T> while Some, convert to Err("not found") for None value
 pub trait IfNotFound<T> {
-    fn if_not_found(self) -> anyhow::Result<T>;
+    fn if_not_found(self, str: String) -> anyhow::Result<T>;
 }
 
 /// convert Option<T> to Result<T>
 impl<T> IfNotFound<T> for Option<T> {
-    fn if_not_found(self) -> anyhow::Result<T> {
+    fn if_not_found(self, str: String) -> anyhow::Result<T> {
         match self {
             Some(t) => Ok(t),
-            _ => Err(anyhow!("not found")),
+            _ => Err(anyhow!("not found {}", str)),
         }
     }
 }

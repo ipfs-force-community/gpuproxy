@@ -239,7 +239,7 @@ impl Common for DbOpsImpl {
             .filter(Tasks::Column::Id.eq(tid.clone()))
             .one(&self.conn)
             .await?
-            .if_not_found()
+            .if_not_found(tid)
     }
 
     async fn fetch_undo(&self) -> Result<Vec<Task>> {
@@ -254,10 +254,10 @@ impl Common for DbOpsImpl {
         Tasks::Entity::find()
             .select_only()
             //.column(Tasks::Column::Status)
-            .filter(Tasks::Column::Id.eq(tid))
+            .filter(Tasks::Column::Id.eq(tid.clone()))
             .one(&self.conn)
             .await?
-            .if_not_found()
+            .if_not_found(tid)
             .map(|e| e.state)
     }
 
@@ -305,10 +305,10 @@ impl Resource for DbOpsImpl {
 
     async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
         ResourceInfos::Entity::find()
-            .filter(ResourceInfos::Column::Id.eq(resource_id))
+            .filter(ResourceInfos::Column::Id.eq(resource_id.clone()))
             .one(&self.conn)
             .await?
-            .if_not_found()
+            .if_not_found(resource_id)
             .map(|val: ResourceInfo| Base64Byte::new(val.data))
             .anyhow()
     }

@@ -93,7 +93,7 @@ impl Worker for LocalWorker {
                                     select_task = v;
                                 }
                                 Err(e) => {
-                                    error!("unable to get task {}", e);
+                                    debug!("unable to get task {}", e);
                                     continue;
                                 }
                             }

@@ -146,7 +146,7 @@ async fn run_cfg(cfg: ServiceConfig) {
     let mut opt = ConnectOptions::new(cfg.db_dsn);
     opt.max_connections(10)
         .min_connections(5)
-        .sqlx_logging(false)
+        .sqlx_logging(true)
         .max_lifetime(Duration::from_secs(120))
         .connect_timeout(Duration::from_secs(8))
         .idle_timeout(Duration::from_secs(8));
