@@ -171,8 +171,7 @@ impl Worker for LocalWorker {
                                         match exec_result {
                                             Ok(proof_arg) => {
                                                 info!("worker {} complted {} success", worker_id.clone(), undo_task.id);
-                                                let base64_proof = base64::encode(proof_arg.proof).to_string();
-                                                if let Some(e) = fetcher.record_proof(worker_id.clone(), undo_task.id.clone(), base64_proof).await{
+                                                if let Some(e) = fetcher.record_proof(worker_id.clone(), undo_task.id.clone(), proof_arg.proof).await{
                                                     error!("record proof for task {} error reason {}", undo_task.id.clone(), e.to_string())
                                                 }
                                             }

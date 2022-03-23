@@ -167,7 +167,7 @@ async fn process_line(cfg: &C2PluginCfg, line: &str) -> Result<SealCommitPhase2O
             ));
         } else if task.state == TaskState::Completed {
             return Ok(SealCommitPhase2Output {
-                proof: base64::decode(task.proof)?,
+                proof: task.proof,
             });
         } else {
             continue;

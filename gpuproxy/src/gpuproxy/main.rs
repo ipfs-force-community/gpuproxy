@@ -146,14 +146,13 @@ async fn run_cfg(cfg: ServiceConfig) {
     let mut opt = ConnectOptions::new(cfg.db_dsn);
     opt.max_connections(10)
         .min_connections(5)
-        .sqlx_logging(true)
+        .sqlx_logging(false)
         .max_lifetime(Duration::from_secs(120))
         .connect_timeout(Duration::from_secs(8))
         .idle_timeout(Duration::from_secs(8));
 
     let db_conn = Database::connect(opt).await.unwrap();
     Migrator::up(&db_conn, None).await.unwrap();
-
     let db_ops = db_ops::DbOpsImpl::new(db_conn);
     let worker_id = db_ops.get_worker_id().await.unwrap();
     let arc_pool = Arc::new(db_ops);

@@ -64,7 +64,7 @@ pub trait ProxyRpc {
         &self,
         worker_id_arg: String,
         tid: String,
-        proof: String,
+        proof: Base64Byte,
     ) -> RpcResult<bool>;
 
     #[method(name = "Proof.RecordError")]
@@ -209,10 +209,10 @@ impl ProxyRpcServer for ProxyImpl {
         &self,
         worker_id_arg: String,
         tid: String,
-        proof: String,
+        proof: Base64Byte,
     ) -> RpcResult<bool> {
         self.pool
-            .record_proof(worker_id_arg, tid, proof)
+            .record_proof(worker_id_arg, tid, proof.0)
             .await
             .reverse_map_err()
     }
@@ -327,10 +327,10 @@ impl WorkerFetch for WrapClient {
         &self,
         worker_id: String,
         tid: String,
-        proof: String,
+        proof: Vec<u8>,
     ) -> Option<anyhow::Error> {
         self.client
-            .record_proof(worker_id, tid, proof)
+            .record_proof(worker_id, tid, Base64Byte(proof))
             .await
             .err()
             .map(|e| anyhow!(e.to_string()))
@@ -370,7 +370,7 @@ pub trait GpuServiceRpcClient {
         &self,
         worker_id_arg: String,
         tid: String,
-        proof: String,
+        proof: Base64Byte,
     ) -> anyhow::Result<bool>;
 
     async fn record_error(
@@ -444,7 +444,7 @@ impl GpuServiceRpcClient for WrapClient {
         &self,
         worker_id_arg: String,
         tid: String,
-        proof: String,
+        proof: Base64Byte,
     ) -> anyhow::Result<bool> {
         self.client
             .record_proof(worker_id_arg, tid, proof)
