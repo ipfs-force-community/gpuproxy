@@ -11,7 +11,8 @@ pub struct Model {
     pub id: String,
     pub miner: String,
     pub resource_id: String,
-    pub proof: String,
+    #[sea_orm(column_type = "Binary")]
+    pub proof: Vec<u8>,
     pub worker_id: String,
     pub task_type: TaskType,
     pub error_msg: String,

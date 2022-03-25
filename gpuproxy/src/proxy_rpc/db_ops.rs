@@ -7,6 +7,7 @@ use entity::worker_info as WorkerInfos;
 use ResourceInfos::Model as ResourceInfo;
 use Tasks::Model as Task;
 use WorkerInfos::Model as WorkerInfo;
+use fil_types::json::vec;
 
 use crate::resource::Resource;
 use crate::utils::Base64Byte;
@@ -48,7 +49,7 @@ pub trait WorkerFetch {
         &self,
         worker_id_arg: String,
         tid: String,
-        proof: String,
+        proof: Vec<u8>,
     ) -> Option<anyhow::Error>;
 }
 
@@ -173,7 +174,7 @@ impl WorkerFetch for DbOpsImpl {
         &self,
         worker_id_arg: String,
         tid: String,
-        proof_str: String,
+        proof_str: Vec<u8>,
     ) -> Option<anyhow::Error> {
         Tasks::Entity::update_many()
             .col_expr(Tasks::Column::State, Expr::value(TaskState::Completed))
@@ -216,7 +217,7 @@ impl Common for DbOpsImpl {
             task_type: Set(task_type),
             state: Set(TaskState::Init),
             create_at: Set(Utc::now().timestamp()),
-            proof: Set("".to_string()),
+            proof: Set(vec!()),
             error_msg: Set("".to_string()),
             start_at: Set(0),
             complete_at: Set(0),
@@ -239,7 +240,7 @@ impl Common for DbOpsImpl {
             .filter(Tasks::Column::Id.eq(tid.clone()))
             .one(&self.conn)
             .await?
-            .if_not_found()
+            .if_not_found(tid)
     }
 
     async fn fetch_undo(&self) -> Result<Vec<Task>> {
@@ -254,10 +255,10 @@ impl Common for DbOpsImpl {
         Tasks::Entity::find()
             .select_only()
             //.column(Tasks::Column::Status)
-            .filter(Tasks::Column::Id.eq(tid))
+            .filter(Tasks::Column::Id.eq(tid.clone()))
             .one(&self.conn)
             .await?
-            .if_not_found()
+            .if_not_found(tid)
             .map(|e| e.state)
     }
 
@@ -305,10 +306,10 @@ impl Resource for DbOpsImpl {
 
     async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
         ResourceInfos::Entity::find()
-            .filter(ResourceInfos::Column::Id.eq(resource_id))
+            .filter(ResourceInfos::Column::Id.eq(resource_id.clone()))
             .one(&self.conn)
             .await?
-            .if_not_found()
+            .if_not_found(resource_id)
             .map(|val: ResourceInfo| Base64Byte::new(val.data))
             .anyhow()
     }

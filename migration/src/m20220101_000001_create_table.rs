@@ -28,7 +28,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(ResourceInfo::Column::Data)
-                            .string()
+                            .binary()
                             .not_null(),
                     )
                     .col(
@@ -72,7 +72,7 @@ impl MigrationTrait for Migration {
                             .string()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(Tasks::Column::Proof).string().not_null())
+                    .col(ColumnDef::new(Tasks::Column::Proof).binary().not_null())
                     .col(ColumnDef::new(Tasks::Column::WorkerId).string().not_null())
                     .col(ColumnDef::new(Tasks::Column::TaskType).integer().not_null())
                     .col(ColumnDef::new(Tasks::Column::ErrorMsg).string().not_null())

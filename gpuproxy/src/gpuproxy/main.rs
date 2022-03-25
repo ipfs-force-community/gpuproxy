@@ -153,7 +153,6 @@ async fn run_cfg(cfg: ServiceConfig) {
 
     let db_conn = Database::connect(opt).await.unwrap();
     Migrator::up(&db_conn, None).await.unwrap();
-
     let db_ops = db_ops::DbOpsImpl::new(db_conn);
     let worker_id = db_ops.get_worker_id().await.unwrap();
     let arc_pool = Arc::new(db_ops);
