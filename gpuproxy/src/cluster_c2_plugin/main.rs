@@ -1,10 +1,10 @@
-use anyhow::anyhow;
 use clap::{Arg, Command};
 use gpuproxy::cli;
 use gpuproxy::proxy_rpc::rpc::GpuServiceRpcClient;
+use gpuproxy::proxy_rpc::rpc::WrapClient;
 use log::*;
 
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 use filecoin_proofs::ProverId;
 use filecoin_proofs_api::seal::SealCommitPhase1Output;
 use filecoin_proofs_api::seal::SealCommitPhase2Output;
@@ -36,7 +36,14 @@ pub struct C2Input {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+struct Request<T> {
+    pub id: u64,
+    pub data: T,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct Response<T> {
+    pub id: u64,
     pub err_msg: Option<String>,
     pub result: Option<T>,
 }
@@ -112,48 +119,72 @@ async fn run(cfg: C2PluginCfg) -> Result<()> {
     info!("stage {}, pid {} processor ready", c2_stage_name, pid);
     loop {
         debug!("waiting for new incoming line");
-        input.read_line(&mut line)?;
-        trace!("line: {}", line.as_str());
-
-        debug!("process line");
-        let response = match process_line(&cfg, line.as_str()).await {
-            Ok(o) => Response {
-                err_msg: None,
-                result: Some(o),
-            },
-
-            Err(e) => Response {
-                err_msg: Some(format!("{:?}", e)),
-                result: None,
-            },
-        };
-        trace!("response: {:?}", response);
-
-        debug!("write output");
-        let res_str = to_string(&response)?;
-        trace!("response: {}", res_str.as_str());
-        writeln!(output, "{}", res_str)?;
         line.clear();
+        let size = input.read_line(&mut line)?;
+        if size == 0 {
+            return Err(anyhow!("got empty line, parent might be out"));
+        }
+
+        let req: Request<C2Input> = match from_str(&line).context("unmarshal request") {
+            Ok(r) => r,
+            Err(e) => {
+                error!("unmarshal request: {:?}", e);
+                continue;
+            }
+        };
+
+        debug!("process request id {}, size {}", req.id, size);
+        if let Err(e) = process_request(&cfg, req).await{
+            error!("failed: {:?}", e);
+        }
     }
 }
 
-async fn process_line(cfg: &C2PluginCfg, line: &str) -> Result<SealCommitPhase2Output> {
-    let input: C2Input = from_str(line)?;
+async fn process_request(cfg: &C2PluginCfg, req: Request<C2Input>) -> Result<()> {
+    let id = req.id;
+    let input = req.data;
     trace!("input: {:?}", input);
 
-    let params = Base64Byte(serde_json::to_vec(&input)?);
+    let params = Base64Byte(serde_json::to_vec(&input).context("unmarshal c2 input")?);
     let miner_addr = forest_address::Address::new_id(input.miner_id).to_string();
 
-    let proxy_client = get_proxy_api(cfg.url.clone()).await?;
+    let proxy_client = get_proxy_api(cfg.url.clone()).await.context("connect gpu proxy url")?;
     let task_id = proxy_client
         .add_task(miner_addr, TaskType::C2, params)
-        .await?;
+        .await.context("add task")?;
 
     info!(
         "miner_id {} submit task {} successfully",
         input.miner_id, task_id
     );
 
+
+    let resp = match track_task_result(cfg, task_id, proxy_client).await {
+        Ok(out) => Response {
+            id: id,
+            err_msg: None,
+            result: Some(out),
+        },
+
+        Err(e) => Response {
+            id: id,
+            err_msg: Some(format!("{:?}", e)),
+            result: None,
+        },
+    };
+
+    let res_str = to_string(&resp).context("marshal response")?;
+    let sout = stdout();
+    let mut output = sout.lock();
+    writeln!(output, "{}", res_str)?;
+    drop(output);
+
+    debug!("response written");
+    Ok(())
+}
+
+
+async fn track_task_result(cfg: &C2PluginCfg,task_id: String, proxy_client: WrapClient)  -> Result<SealCommitPhase2Output> {
     let duration = Duration::from_secs(cfg.pool_task_interval);
     loop {
         let mut interval = time::interval(duration);
