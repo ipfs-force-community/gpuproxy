@@ -58,7 +58,7 @@ pub fn ready_msg(name: &str) -> String {
 #[tokio::main]
 async fn main() {
     env_logger::init();
-    
+
     let worker_args = cli::get_worker_arg();
     let app_m = Command::new("cluster_c2_plugin")
         .version("0.0.1")
@@ -144,7 +144,7 @@ async fn run(cfg: C2PluginCfg) -> Result<()> {
             if let Err(e) = process_request(cfg_clone, req).await{
                 error!("failed: {:?}", e);
             }
-        }));
+        }).await);
     }
 }
 
