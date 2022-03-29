@@ -1,3 +1,5 @@
+#![feature(async_closure)]
+
 use clap::{Arg, Command};
 use gpuproxy::cli;
 use gpuproxy::proxy_rpc::rpc::GpuServiceRpcClient;
@@ -21,6 +23,7 @@ use gpuproxy::utils::Base64Byte;
 use serde::{Deserialize, Serialize};
 use tracing::info_span;
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct C2PluginCfg {
     url: String,
     pool_task_interval: u64,
@@ -54,6 +57,8 @@ pub fn ready_msg(name: &str) -> String {
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+    
     let worker_args = cli::get_worker_arg();
     let app_m = Command::new("cluster_c2_plugin")
         .version("0.0.1")
@@ -134,13 +139,16 @@ async fn run(cfg: C2PluginCfg) -> Result<()> {
         };
 
         debug!("process request id {}, size {}", req.id, size);
-        if let Err(e) = process_request(&cfg, req).await{
-            error!("failed: {:?}", e);
-        }
+        let cfg_clone = cfg.clone();
+        tokio::spawn(futures::future::lazy(async move |_| {
+            if let Err(e) = process_request(cfg_clone, req).await{
+                error!("failed: {:?}", e);
+            }
+        }));
     }
 }
 
-async fn process_request(cfg: &C2PluginCfg, req: Request<C2Input>) -> Result<()> {
+async fn process_request(cfg: C2PluginCfg, req: Request<C2Input>) -> Result<()> {
     let id = req.id;
     let input = req.data;
     trace!("input: {:?}", input);
@@ -184,7 +192,7 @@ async fn process_request(cfg: &C2PluginCfg, req: Request<C2Input>) -> Result<()>
 }
 
 
-async fn track_task_result(cfg: &C2PluginCfg,task_id: String, proxy_client: WrapClient)  -> Result<SealCommitPhase2Output> {
+async fn track_task_result(cfg: C2PluginCfg,task_id: String, proxy_client: WrapClient)  -> Result<SealCommitPhase2Output> {
     let duration = Duration::from_secs(cfg.pool_task_interval);
     loop {
         let mut interval = time::interval(duration);
