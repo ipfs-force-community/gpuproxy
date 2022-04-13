@@ -4,10 +4,10 @@ use std::sync::{Arc, Mutex};
 use entity::resource_info as ResourceInfos;
 use entity::tasks as Tasks;
 use entity::worker_info as WorkerInfos;
+use fil_types::json::vec;
 use ResourceInfos::Model as ResourceInfo;
 use Tasks::Model as Task;
 use WorkerInfos::Model as WorkerInfo;
-use fil_types::json::vec;
 
 use crate::resource::Resource;
 use crate::utils::Base64Byte;
@@ -22,6 +22,7 @@ use sea_orm::entity::prelude::*;
 use sea_orm::prelude::*;
 use sea_orm::sea_query::Expr;
 use sea_orm::ActiveValue::Set;
+use sea_orm::TransactionTrait;
 use sea_orm::{DatabaseConnection, NotSet, QuerySelect};
 
 use async_trait::async_trait;
@@ -119,22 +120,30 @@ impl WorkerFetch for DbOpsImpl {
         worker_id_arg: String,
         types: Option<Vec<entity::TaskType>>,
     ) -> Result<Task> {
-        let mut query = Tasks::Entity::find().filter(Tasks::Column::State.eq(TaskState::Init));
+        self.conn
+            .transaction::<_, Task, DbErr>(|txn| {
+                Box::pin(async move {
+                    let mut query =
+                        Tasks::Entity::find().filter(Tasks::Column::State.eq(TaskState::Init));
 
-        if let Some(state_arg) = types {
-            query = query.filter(Tasks::Column::TaskType.is_in(state_arg));
-        }
+                    if let Some(state_arg) = types {
+                        query = query.filter(Tasks::Column::TaskType.is_in(state_arg));
+                    }
 
-        let undo_task_opt: Option<Task> = query.one(&self.conn).await.anyhow()?;
-        if let Some(undo_task) = undo_task_opt {
-            let mut undo_task_active: Tasks::ActiveModel = undo_task.into();
-            undo_task_active.state = Set(TaskState::Running);
-            undo_task_active.worker_id = Set(worker_id_arg);
-            undo_task_active.start_at = Set(Utc::now().timestamp());
-            undo_task_active.update(&self.conn).await.anyhow()
-        } else {
-            Err(anyhow!("no task to do for worker"))
-        }
+                    let undo_task_opt: Option<Task> = query.one(txn).await?;
+                    if let Some(undo_task) = undo_task_opt {
+                        let mut undo_task_active: Tasks::ActiveModel = undo_task.into();
+                        undo_task_active.state = Set(TaskState::Running);
+                        undo_task_active.worker_id = Set(worker_id_arg);
+                        undo_task_active.start_at = Set(Utc::now().timestamp());
+                        undo_task_active.update(txn).await
+                    } else {
+                        Err(DbErr::Query("no task to do for worker".to_owned()))
+                    }
+                })
+            })
+            .await
+            .anyhow()
     }
 
     async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>> {
@@ -217,7 +226,7 @@ impl Common for DbOpsImpl {
             task_type: Set(task_type),
             state: Set(TaskState::Init),
             create_at: Set(Utc::now().timestamp()),
-            proof: Set(vec!()),
+            proof: Set(vec![]),
             error_msg: Set("".to_string()),
             start_at: Set(0),
             complete_at: Set(0),

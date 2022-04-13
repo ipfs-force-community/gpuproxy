@@ -140,11 +140,14 @@ async fn run(cfg: C2PluginCfg) -> Result<()> {
 
         debug!("process request id {}, size {}", req.id, size);
         let cfg_clone = cfg.clone();
-        tokio::spawn(futures::future::lazy(async move |_| {
-            if let Err(e) = process_request(cfg_clone, req).await{
-                error!("failed: {:?}", e);
-            }
-        }).await);
+        tokio::spawn(
+            futures::future::lazy(async move |_| {
+                if let Err(e) = process_request(cfg_clone, req).await {
+                    error!("failed: {:?}", e);
+                }
+            })
+            .await,
+        );
     }
 }
 
@@ -156,16 +159,18 @@ async fn process_request(cfg: C2PluginCfg, req: Request<C2Input>) -> Result<()> 
     let params = Base64Byte(serde_json::to_vec(&input).context("unmarshal c2 input")?);
     let miner_addr = forest_address::Address::new_id(input.miner_id).to_string();
 
-    let proxy_client = get_proxy_api(cfg.url.clone()).await.context("connect gpu proxy url")?;
+    let proxy_client = get_proxy_api(cfg.url.clone())
+        .await
+        .context("connect gpu proxy url")?;
     let task_id = proxy_client
         .add_task(miner_addr, TaskType::C2, params)
-        .await.context("add task")?;
+        .await
+        .context("add task")?;
 
     info!(
         "miner_id {} submit task {} successfully",
         input.miner_id, task_id
     );
-
 
     let resp = match track_task_result(cfg, task_id, proxy_client).await {
         Ok(out) => Response {
@@ -191,8 +196,11 @@ async fn process_request(cfg: C2PluginCfg, req: Request<C2Input>) -> Result<()> 
     Ok(())
 }
 
-
-async fn track_task_result(cfg: C2PluginCfg,task_id: String, proxy_client: WrapClient)  -> Result<SealCommitPhase2Output> {
+async fn track_task_result(
+    cfg: C2PluginCfg,
+    task_id: String,
+    proxy_client: WrapClient,
+) -> Result<SealCommitPhase2Output> {
     let duration = Duration::from_secs(cfg.pool_task_interval);
     loop {
         let mut interval = time::interval(duration);
@@ -205,9 +213,7 @@ async fn track_task_result(cfg: C2PluginCfg,task_id: String, proxy_client: WrapC
                 task.error_msg
             ));
         } else if task.state == TaskState::Completed {
-            return Ok(SealCommitPhase2Output {
-                proof: task.proof,
-            });
+            return Ok(SealCommitPhase2Output { proof: task.proof });
         } else {
             continue;
         }
