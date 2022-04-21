@@ -49,11 +49,11 @@ async fn main() {
                     Arg::new("resource-type")
                         .long("resource-type")
                         .env("C2PROXY_RESOURCE_TYPE")
-                        .default_value("db")
-                        .help("resource type(db, fs)"),
+                        .default_value("fs")
+                        .help("resource type(db(only for test, have bug in seaorm to save longblob), fs)"),
                     Arg::new("fs-resource-path")
                         .long("fs-resource-path")
-                        .env("./tar")
+                        .env("C2PROXY_FS_RESOURCE_PATH")
                         .default_value("")
                         .help("when resource type is fs, will use this path to read resource"),
                     Arg::new("allow-type")
