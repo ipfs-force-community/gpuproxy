@@ -20,6 +20,7 @@ pub struct ServiceConfig {
 
     pub log_level: String,
     pub resource: Resource,
+    pub debug_sql: bool,
 }
 
 impl ServiceConfig {
@@ -32,6 +33,7 @@ impl ServiceConfig {
         resource_path: String,
         log_level: String,
         allow_types: Option<Vec<TaskType>>,
+        debug_sql: bool,
     ) -> Self {
         let resource = if resource_type == "db" {
             Resource::Db
@@ -47,6 +49,7 @@ impl ServiceConfig {
             log_level,
             resource,
             allow_types,
+            debug_sql,
         }
     }
 }
@@ -61,6 +64,7 @@ pub struct WorkerConfig {
 
     pub log_level: String,
     pub resource: Resource,
+    pub debug_sql: bool,
 }
 
 impl WorkerConfig {
@@ -72,6 +76,7 @@ impl WorkerConfig {
         resource_path: String,
         log_level: String,
         allow_types: Option<Vec<TaskType>>,
+        debug_sql: bool,
     ) -> Self {
         let resource = if resource_type == "db" {
             Resource::Db
@@ -85,6 +90,7 @@ impl WorkerConfig {
             resource,
             log_level,
             allow_types,
+            debug_sql,
         }
     }
 }

@@ -78,6 +78,13 @@ async fn main() {
                         .multiple_values(true)
                         .takes_value(true)
                         .help("task types that worker support (c2 = 0)"),
+                    Arg::new("debug-sql")
+                        .long("debug-sql")
+                        .env("C2PROXY_DEBUG_SQL")
+                        .required(false)
+                        .takes_value(false)
+                        .default_value("false")
+                        .help("print sql to debug"),
                 ])
                 .args(worker_args),
         )
@@ -93,6 +100,7 @@ async fn main() {
             let max_tasks: usize = sub_m.value_of_t("max-tasks").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
             let log_level: String = sub_m.value_of_t("log-level").unwrap_or_else(|e| e.exit());
+            let debug_sql: bool = sub_m.value_of_t("debug-sql").unwrap_or_else(|e| e.exit());
             let resource_type: String = sub_m
                 .value_of_t("resource-type")
                 .unwrap_or_else(|e| e.exit());
@@ -123,6 +131,7 @@ async fn main() {
                 fs_resource_type,
                 log_level.clone(),
                 allow_types,
+                debug_sql,
             );
 
             let lv = LevelFilter::from_str(cfg.log_level.as_str()).unwrap();
@@ -146,7 +155,7 @@ async fn run_cfg(cfg: ServiceConfig) {
     let mut opt = ConnectOptions::new(cfg.db_dsn);
     opt.max_connections(10)
         .min_connections(5)
-        .sqlx_logging(false)
+        .sqlx_logging(cfg.debug_sql)
         .max_lifetime(Duration::from_secs(120))
         .connect_timeout(Duration::from_secs(8))
         .idle_timeout(Duration::from_secs(8));

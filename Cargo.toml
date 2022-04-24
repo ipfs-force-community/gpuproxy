@@ -9,3 +9,6 @@ members = [
 # sqlx/sqlx-core/rsa/num-bigint-dig use spin_no_std features ,this features break build in rust-gpu-tools build
 [patch.crates-io]
 lazy_static = { git = "https://github.com/qy3u/lazy-static.rs.git" }
+
+# fix create index error, remove this if sea orm fix this issue https://github.com/SeaQL/sea-orm/issues/682
+sea-query = { git = "https://github.com/hunjixin/sea-query", branch = "feat/0.23.0_index" }
