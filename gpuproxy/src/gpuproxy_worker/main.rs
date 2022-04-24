@@ -126,7 +126,7 @@ async fn main() {
             opt.max_connections(10)
                 .min_connections(5)
                 .sqlx_logging(cfg.debug_sql);
-        
+
             let db_conn = Database::connect(opt).await.unwrap();
             Migrator::up(&db_conn, None).await.unwrap();
 
