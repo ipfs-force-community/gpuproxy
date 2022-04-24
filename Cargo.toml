@@ -8,4 +8,4 @@ members = [
 
 # sqlx/sqlx-core/rsa/num-bigint-dig use spin_no_std features ,this features break build in rust-gpu-tools build
 [patch.crates-io]
-lazy_static = { git = "ssh://git@github.com/qy3u/lazy-static.rs.git" }
+lazy_static = { git = "https://github.com/qy3u/lazy-static.rs.git" }

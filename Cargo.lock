@@ -2286,7 +2286,7 @@ dependencies = [
 [[package]]
 name = "lazy_static"
 version = "1.5.0"
-source = "git+ssh://git@github.com/qy3u/lazy-static.rs.git#073e23ae6bb3650bc7e818cb64ef5013f0c12f13"
+source = "git+https://github.com/qy3u/lazy-static.rs.git#073e23ae6bb3650bc7e818cb64ef5013f0c12f13"
 
 [[package]]
 name = "leb128"
