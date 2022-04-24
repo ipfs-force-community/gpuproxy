@@ -23,15 +23,11 @@ name = "cluster_c2_plugin"
 path = "src/cluster_c2_plugin/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 entity = { path = "../entity" }
 migration = { path = "../migration" }
 
 async-trait = "0.1.52"
-storage-proofs-core = "11.0.2"
-filecoin-proofs = "11.0.2"
-filecoin-proofs-api = "11.0.0"
 clap = { version = "3.0.4", features = ["derive", "env"] }
 jsonrpsee = { version = "^0.8.0", features = ["full"] }
 jsonrpsee-core = "0.9.0"
@@ -66,6 +62,11 @@ futures-util = "0.3.21"
 hyper = "0.14.17"
 socket2 = "0.4.4"
 
+# filecoin dependencies
+storage-proofs-core = { version = "~11.0", default-features = false}
+filecoin-proofs = { version = "~11.0", default-features = false}
+filecoin-proofs-api = { version = "~11.0", default-features = false}
+
 [dependencies.sea-orm]
 version ="0.6.0"
 features = [
@@ -81,3 +82,9 @@ default-features = false
 [dependencies.fil_types]
 version = "0.2"
 features = ["json"]
+
+
+[features]
+default = ["opencl"]
+opencl = ["filecoin-proofs-api/opencl", "filecoin-proofs/opencl", "storage-proofs-core/opencl"]
+cuda = ["filecoin-proofs-api/cuda", "filecoin-proofs/cuda", "storage-proofs-core/cuda"]

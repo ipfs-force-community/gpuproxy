@@ -13,4 +13,3 @@ example
 *.db
 *db-shm
 *db-wal
-*.lock
