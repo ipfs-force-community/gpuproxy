@@ -9,7 +9,7 @@ use gpuproxy::proxy_rpc::*;
 use gpuproxy::resource;
 use log::*;
 use migration::{Migrator, MigratorTrait};
-use sea_orm::Database;
+use sea_orm::{ConnectOptions, Database};
 use simplelog::*;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -61,6 +61,13 @@ async fn main() {
                         .multiple_values(true)
                         .takes_value(true)
                         .help("task types that worker support (c2 = 0)"),
+                    Arg::new("debug-sql")
+                        .long("debug-sql")
+                        .env("C2PROXY_DEBUG_SQL")
+                        .required(false)
+                        .takes_value(false)
+                        .default_value("false")
+                        .help("print sql to debug issue"),
                 ])
                 .args(worker_args),
         )
@@ -76,6 +83,7 @@ async fn main() {
             let max_tasks: usize = sub_m.value_of_t("max-tasks").unwrap_or_else(|e| e.exit());
             let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
             let log_level: String = sub_m.value_of_t("log-level").unwrap_or_else(|e| e.exit());
+            let debug_sql: bool = sub_m.value_of_t("debug-sql").unwrap_or_else(|e| e.exit());
             let resource_type: String = sub_m
                 .value_of_t("resource-type")
                 .unwrap_or_else(|e| e.exit());
@@ -102,6 +110,7 @@ async fn main() {
                 fs_resource_type,
                 log_level,
                 allow_types,
+                debug_sql,
             );
 
             let lv = LevelFilter::from_str(cfg.log_level.as_str()).unwrap();
@@ -113,7 +122,12 @@ async fn main() {
             )
             .unwrap();
 
-            let db_conn = Database::connect(cfg.db_dsn.as_str()).await.unwrap();
+            let mut opt = ConnectOptions::new(cfg.db_dsn);
+            opt.max_connections(10)
+                .min_connections(5)
+                .sqlx_logging(cfg.debug_sql);
+
+            let db_conn = Database::connect(opt).await.unwrap();
             Migrator::up(&db_conn, None).await.unwrap();
 
             let db_ops = db_ops::DbOpsImpl::new(db_conn);

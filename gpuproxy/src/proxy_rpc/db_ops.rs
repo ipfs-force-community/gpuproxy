@@ -18,14 +18,13 @@ use entity::{TaskState, TaskType};
 use log::info;
 use uuid::Uuid;
 
+use async_trait::async_trait;
 use sea_orm::entity::prelude::*;
 use sea_orm::prelude::*;
-use sea_orm::sea_query::Expr;
+use sea_orm::sea_query::{Expr, Order};
 use sea_orm::ActiveValue::Set;
 use sea_orm::TransactionTrait;
-use sea_orm::{DatabaseConnection, NotSet, QuerySelect};
-
-use async_trait::async_trait;
+use sea_orm::{DatabaseConnection, NotSet, QueryOrder, QuerySelect};
 
 #[async_trait]
 pub trait WorkerApi {
@@ -125,10 +124,10 @@ impl WorkerFetch for DbOpsImpl {
                 Box::pin(async move {
                     let mut query =
                         Tasks::Entity::find().filter(Tasks::Column::State.eq(TaskState::Init));
-
                     if let Some(state_arg) = types {
                         query = query.filter(Tasks::Column::TaskType.is_in(state_arg));
                     }
+                    query = query.order_by(Tasks::Column::CreateAt, Order::Asc);
 
                     let undo_task_opt: Option<Task> = query.one(txn).await?;
                     if let Some(undo_task) = undo_task_opt {
@@ -150,6 +149,7 @@ impl WorkerFetch for DbOpsImpl {
         Tasks::Entity::find()
             .filter(Tasks::Column::State.eq(TaskState::Running))
             .filter(Tasks::Column::WorkerId.eq(worker_id_arg))
+            .order_by(Tasks::Column::CreateAt, Order::Asc)
             .all(&self.conn)
             .await
             .map_err(|e| anyhow!(e.to_string()))
@@ -247,6 +247,7 @@ impl Common for DbOpsImpl {
     async fn fetch(&self, tid: String) -> Result<Task> {
         Tasks::Entity::find()
             .filter(Tasks::Column::Id.eq(tid.clone()))
+            .order_by(Tasks::Column::CreateAt, Order::Asc)
             .one(&self.conn)
             .await?
             .if_not_found(tid)
@@ -255,6 +256,7 @@ impl Common for DbOpsImpl {
     async fn fetch_undo(&self) -> Result<Vec<Task>> {
         Tasks::Entity::find()
             .filter(Tasks::Column::State.eq(TaskState::Init))
+            .order_by(Tasks::Column::CreateAt, Order::Asc)
             .all(&self.conn)
             .await
             .anyhow()
@@ -298,6 +300,7 @@ impl Common for DbOpsImpl {
         if let Some(state_arg) = state_cod {
             query = query.filter(Tasks::Column::State.is_in(state_arg));
         }
+        query = query.order_by(Tasks::Column::CreateAt, Order::Asc);
         query.all(&self.conn).await.anyhow()
     }
 }

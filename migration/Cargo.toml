@@ -13,17 +13,16 @@ name = "migration"
 path = "src/main.rs"
 
 [dependencies]
-sea-schema = { version = "^0.5.0", default-features = false, features = [ "migration", "debug-print" ] }
+sea-schema = { version = "^0.7.1", default-features = false, features = [ "migration" ] }
 entity = { path = "../entity" }
+log = { version = "0.4", features = ["std"] }
 
 [dependencies.sea-orm]
-version ="0.6.0"
+version ="0.7.0"
 features = [
     "macros",
-    "debug-print",
     "runtime-tokio-native-tls",
     "sqlx-sqlite",
-    # "sqlx-postgres",
     "sqlx-mysql",
 ]
 default-features = false
