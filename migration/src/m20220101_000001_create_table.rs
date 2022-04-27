@@ -28,7 +28,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(ResourceInfo::Column::Data)
-                            .binary()
+                            .binary_len(1024*1024*1024)  //max to 1 GiB
                             .not_null(),
                     )
                     .col(
@@ -72,7 +72,7 @@ impl MigrationTrait for Migration {
                             .string()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(Tasks::Column::Proof).binary().not_null())
+                    .col(ColumnDef::new(Tasks::Column::Proof).binary_len(1024*1024).not_null())   //proof max to 1NiB
                     .col(ColumnDef::new(Tasks::Column::WorkerId).string().not_null())
                     .col(ColumnDef::new(Tasks::Column::TaskType).integer().not_null())
                     .col(ColumnDef::new(Tasks::Column::ErrorMsg).string().not_null())

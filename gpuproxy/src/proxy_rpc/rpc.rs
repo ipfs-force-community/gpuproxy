@@ -43,6 +43,14 @@ pub trait ProxyRpc {
         param: Base64Byte,
     ) -> RpcResult<String>;
 
+    #[method(name = "Proof.AddTaskWithExitResource")]
+    async fn add_task_with_exit_resource(
+        &self,
+        miner: String,
+        task_type: entity::TaskType,
+        resouce_id: String,
+    ) -> RpcResult<String>;
+
     #[method(name = "Proof.GetTask")]
     async fn get_task(&self, id: String) -> RpcResult<Task>;
 
@@ -111,12 +119,7 @@ impl ProxyImpl {
                 .internal_call_error()?;
         }
 
-        let mut buf = bytes::BytesMut::new();
-        buf.put_slice(&addr.payload_bytes());
-        buf.put_i32(task_type.into());
-        buf.put_slice(resource_id.clone().as_bytes());
-        let task_id = Uuid::new_v5(&Uuid::NAMESPACE_OID, buf.as_ref()).to_string();
-
+       let task_id =  ProxyImpl::generate_task_id(addr, task_type, resource_id.clone());
         if !self.pool.has_task(task_id.clone()).await? {
             self.pool
                 .clone()
@@ -125,6 +128,14 @@ impl ProxyImpl {
                 .internal_call_error()?;
         }
         Ok(task_id)
+    }
+
+    fn generate_task_id(addr: forest_address::Address, task_type: TaskType, resource_id: String)-> String{
+        let mut buf = bytes::BytesMut::new();
+        buf.put_slice(&addr.payload_bytes());
+        buf.put_i32(task_type.into());
+        buf.put_slice(resource_id.clone().as_bytes());
+        return Uuid::new_v5(&Uuid::NAMESPACE_OID, buf.as_ref()).to_string();
     }
 }
 
@@ -169,6 +180,30 @@ impl ProxyRpcServer for ProxyImpl {
         }
 
         self.add_task_inner(addr, task_type, param.0).await
+    }
+
+    /// add task with exit resource, if use fs storage, you can storage c2resource in fs, and upload task with the resource name
+    async fn add_task_with_exit_resource(
+        &self,
+        miner: String,
+        task_type: entity::TaskType,
+        resource_id: String,
+    ) -> RpcResult<String>{
+        let addr = forest_address::Address::from_str(miner.as_str()).invalid_params()?;
+        let has_resource = self.resource.has_resource(resource_id.clone()).await.internal_call_error()?;
+        if !has_resource {
+            return Err(format!("resouce {} not exit", resource_id.clone())).invalid_params()?
+        }
+
+        let task_id = ProxyImpl::generate_task_id(addr, task_type, resource_id.clone());
+        if !self.pool.has_task(task_id.clone()).await? {
+            self.pool
+                .clone()
+                .add_task(task_id.clone(), addr, task_type, resource_id)
+                .await
+                .internal_call_error()?;
+        }
+        Ok(task_id)
     }
 
     /// Get task by id
