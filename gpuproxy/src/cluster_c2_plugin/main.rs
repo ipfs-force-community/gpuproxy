@@ -1,5 +1,3 @@
-#![feature(async_closure)]
-
 use clap::{Arg, Command};
 use gpuproxy::cli;
 use gpuproxy::proxy_rpc::rpc::GpuServiceRpcClient;
@@ -140,14 +138,11 @@ async fn run(cfg: C2PluginCfg) -> Result<()> {
 
         debug!("process request id {}, size {}", req.id, size);
         let cfg_clone = cfg.clone();
-        tokio::spawn(
-            futures::future::lazy(async move |_| {
-                if let Err(e) = process_request(cfg_clone, req).await {
-                    error!("failed: {:?}", e);
-                }
-            })
-            .await,
-        );
+        tokio::spawn(async move {
+            if let Err(e) = process_request(cfg_clone, req).await {
+                error!("failed: {:?}", e);
+            }
+        });
     }
 }
 
