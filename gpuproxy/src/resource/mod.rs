@@ -1,5 +1,6 @@
 use crate::config;
 use crate::utils::Base64Byte;
+use anyhow::Context;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use filecoin_proofs_api::seal::SealCommitPhase1Output;
@@ -53,16 +54,9 @@ impl Resource for FileResource {
     /// get task resource by resource id
     async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
         let new_path = Path::new(self.root.as_str()).join(resource_id.clone());
-        let filename = new_path.to_str().ok_or(anyhow!(
-            "unable to find file for resource {} in directory {}",
-            resource_id.clone(),
-            self.root.clone()
-        ))?;
-        let mut f = File::open(filename)?;
-        let metadata = fs::metadata(filename)?;
-        let mut buffer = vec![0; metadata.len() as usize];
-        f.read(&mut buffer)?;
-        Ok(Base64Byte::new(buffer))
+        let content =
+            fs::read(&new_path).with_context(|| format!("read file: {}", new_path.display()))?;
+        Ok(Base64Byte::new(content))
     }
 
     /// save task resource to file system
