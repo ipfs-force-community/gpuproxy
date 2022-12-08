@@ -35,10 +35,10 @@ mk-dist:
 
 build: mk-dist
 	cargo build --release --workspace $(GPUPROXY_FEATURE_FLAGS)
-	cp release/cluster_c2_plugin ./dist/bin/
-	cp release/gpuproxy ./dist/bin/
-	cp release/gpuproxy_worker ./dist/bin/
-	cp release/migration ./dist/bin/
+	cp target/release/cluster_c2_plugin ./dist/bin/
+	cp target/release/gpuproxy ./dist/bin/
+	cp target/release/gpuproxy_worker ./dist/bin/
+	cp target/release/migration ./dist/bin/
 
 build-amd: RUSTFLAGS+=-C target-cpu=znver2 -C target-feature=+sse4.1,+sse4.2,+avx,+avx2,+sha,+sse2,+adx
 build-amd: CPU_PLATFORM=amd
@@ -47,3 +47,9 @@ build-amd: build
 build-intel: RUSTFLAGS+=-C target-feature=+sse4.1,+sse4.2
 build-intel: CPU_PLATFORM=intel
 build-intel: build
+
+up2ftp-amd:
+    CPU_PLATFORM=amd ./up2ftp.sh all
+
+up2ftp-intel:
+    CPU_PLATFORM=intel ./up2ftp.sh all
