@@ -2298,8 +2298,12 @@ dependencies = [
 
 [[package]]
 name = "lazy_static"
-version = "1.5.0"
-source = "git+https://github.com/qy3u/lazy-static.rs.git#073e23ae6bb3650bc7e818cb64ef5013f0c12f13"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+dependencies = [
+ "spin 0.5.2",
+]
 
 [[package]]
 name = "leb128"
@@ -3585,7 +3589,7 @@ dependencies = [
 [[package]]
 name = "sea-query"
 version = "0.23.0"
-source = "git+https://github.com/hunjixin/sea-query?branch=feat/0.23.0_index#8491f0598b08ae1f4a51a1cf8c37d3fcc9e123c6"
+source = "git+https://github.com/hunjixin/sea-query?branch=feat/0.23.0_index#8ad7411bf9db77e1840b7f4a7223235f4362cf75"
 dependencies = [
  "chrono",
  "rust_decimal",
@@ -3611,7 +3615,7 @@ dependencies = [
 [[package]]
 name = "sea-query-derive"
 version = "0.2.0"
-source = "git+https://github.com/hunjixin/sea-query?branch=feat/0.23.0_index#8491f0598b08ae1f4a51a1cf8c37d3fcc9e123c6"
+source = "git+https://github.com/hunjixin/sea-query?branch=feat/0.23.0_index#8ad7411bf9db77e1840b7f4a7223235f4362cf75"
 dependencies = [
  "heck 0.3.3",
  "proc-macro2",

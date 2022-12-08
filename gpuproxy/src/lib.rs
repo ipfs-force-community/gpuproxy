@@ -1,5 +1,3 @@
-#![feature(result_flattening)]
-#![feature(async_closure)]
 #![allow(dead_code)]
 #![allow(unused_variables)]
 #![allow(unused_imports)]
