@@ -1,13 +1,15 @@
 use crate::proxy_rpc::db_ops::*;
 use crate::resource::{C2Resource, Resource};
 use crate::utils::*;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use entity::resource_info as ResourceInfos;
 use entity::tasks as Tasks;
 use entity::worker_info as WorkerInfos;
 use entity::TaskType;
-use filecoin_proofs_api::seal::seal_commit_phase2;
+use filecoin_proofs_api::seal::{
+    seal_commit_phase2, SealCommitPhase1Output, SealCommitPhase2Output,
+};
 use log::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -136,24 +138,16 @@ impl Worker for LocalWorker {
                                         }
                                         let resource: Vec<u8> = resource_result.unwrap().into();
 
-                                        let worker_id = worker_id.clone();
                                         let result_tx_clone = result_tx.clone();
-                                        info!("prepare successfully for task {} and spawn to run", undo_task.id);
-                                        std::thread::spawn( //avoid block schedule
-                                             move || {
-                                                let result = if undo_task.task_type == TaskType::C2 {
-                                                    //todo ensure send error result for each error condition
-                                                    serde_json::from_slice(&resource).anyhow()
-                                                        .and_then(|c2:C2Resource|{
-                                                            info!("worker {} start to do task {}, size {}", worker_id, undo_task.id, u64::from(c2.c1out.registered_proof.sector_size()));
-                                                            seal_commit_phase2(c2.c1out, c2.prover_id, c2.sector_id)
-                                                    })
-                                                }else{
-                                                   Err(anyhow!("unsupport type of task {} type {:?}", undo_task.id, undo_task.task_type))
-                                                };
-                                                futures::executor::block_on(result_tx_clone.send((undo_task, result))).unwrap();
-                                            },
-                                        );
+                                        info!("worker {} prepare successfully for task {} and spawn to run", worker_id, undo_task.id);
+                                        tokio::spawn(async move {
+                                            let result = if undo_task.task_type == TaskType::C2 {
+                                                c2(resource).await
+                                            } else {
+                                                Err(anyhow!("unsupported type of task {} type {:?}", undo_task.id, undo_task.task_type))
+                                            };
+                                            let _ = result_tx_clone.send((undo_task, result)).await;
+                                        });
                                     }
                                     None => {
                                         error!("unable to fetch undo task, should never occur");
@@ -169,7 +163,7 @@ impl Worker for LocalWorker {
                                if let Some((undo_task, exec_result)) = val {
                                     match exec_result {
                                         Ok(proof_arg) => {
-                                            info!("worker {} complted {} success", worker_id.clone(), undo_task.id);
+                                            info!("worker {} completed {} success", worker_id.clone(), undo_task.id);
                                             if let Some(e) = fetcher.record_proof(worker_id.clone(), undo_task.id.clone(), proof_arg.proof).await{
                                                 error!("record proof for task {} error reason {}", undo_task.id.clone(), e.to_string())
                                             }
@@ -194,5 +188,43 @@ impl Worker for LocalWorker {
             });
         }
         info!("worker has started");
+    }
+}
+
+async fn c2(resource: Vec<u8>) -> anyhow::Result<SealCommitPhase2Output> {
+    let join_result = tokio::task::spawn_blocking(move || {
+        let c2_resource: C2Resource =
+            serde_json::from_slice(&resource).context("deserialize c2 resource")?;
+
+        info!(
+            "start to do c2 task. size: {}",
+            u64::from(c2_resource.c1out.registered_proof.sector_size())
+        );
+
+        seal_commit_phase2(
+            c2_resource.c1out,
+            c2_resource.prover_id,
+            c2_resource.sector_id,
+        )
+    })
+    .await;
+
+    match join_result {
+        Ok(task_result) => task_result,
+        Err(join_error) => {
+            if join_error.is_panic() {
+                let panic_error = join_error.into_panic();
+                let message = match panic_error.downcast_ref::<&str>() {
+                    Some(msg) => msg.to_string(),
+                    None => panic_error
+                        .downcast_ref::<String>()
+                        .cloned()
+                        .unwrap_or_else(|| "non string panic payload".to_string()),
+                };
+                Err(anyhow::Error::msg(format!("Panic: {}", message)))
+            } else {
+                Err(anyhow::Error::msg(join_error.to_string()))
+            }
+        }
     }
 }
