@@ -63,9 +63,9 @@ hyper = "0.14.17"
 socket2 = "0.4.4"
 
 # filecoin dependencies
-storage-proofs-core = { version = "~11.0", default-features = false}
-filecoin-proofs = { version = "~11.0", default-features = false}
-filecoin-proofs-api = { version = "~11.0", default-features = false}
+storage-proofs-core = { version = "~11.1", default-features = false}
+filecoin-proofs = { version = "~11.1", default-features = false}
+filecoin-proofs-api = { version = "~11.1", default-features = false}
 
 sea-query = { version = "^0.23.0", features = ["thread-safe"] }
 

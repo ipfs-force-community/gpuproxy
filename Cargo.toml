@@ -9,3 +9,60 @@ members = [
 [patch.crates-io]
 # fix create index error, remove this if sea orm fix this issue https://github.com/SeaQL/sea-orm/issues/682
 sea-query = { git = "https://github.com/hunjixin/sea-query", branch = "feat/0.23.0_index" }
+
+
+[patch.crates-io.filecoin-proofs-api]
+git = "http://gitlab.forceup.in/ForceMining/rust-filecoin-proofs-api.git"
+branch = "force/master_v11.1.0"
+
+[patch.crates-io.filecoin-hashers]
+git = "http://gitlab.forceup.in/ForceMining/rust-fil-proofs.git"
+branch = "force/master_v11.1.1"
+package = "filecoin-hashers"
+
+[patch.crates-io.filecoin-proofs]
+git = "http://gitlab.forceup.in/ForceMining/rust-fil-proofs.git"
+branch = "force/master_v11.1.1"
+package = "filecoin-proofs"
+
+[patch.crates-io.fr32]
+git = "http://gitlab.forceup.in/ForceMining/rust-fil-proofs.git"
+branch = "force/master_v11.1.1"
+package = "fr32"
+
+[patch.crates-io.sha2raw]
+git = "http://gitlab.forceup.in/ForceMining/rust-fil-proofs.git"
+branch = "force/master_v11.1.1"
+package = "sha2raw"
+
+[patch.crates-io.storage-proofs-core]
+git = "http://gitlab.forceup.in/ForceMining/rust-fil-proofs.git"
+branch = "force/master_v11.1.1"
+package = "storage-proofs-core"
+
+[patch.crates-io.storage-proofs-porep]
+git = "http://gitlab.forceup.in/ForceMining/rust-fil-proofs.git"
+branch = "force/master_v11.1.1"
+package = "storage-proofs-porep"
+
+[patch.crates-io.storage-proofs-post]
+git = "http://gitlab.forceup.in/ForceMining/rust-fil-proofs.git"
+branch = "force/master_v11.1.1"
+package = "storage-proofs-post"
+
+[patch.crates-io.storage-proofs-update]
+git = "http://gitlab.forceup.in/ForceMining/rust-fil-proofs.git"
+branch = "force/master_v11.1.1"
+package = "storage-proofs-update"
+
+[patch.crates-io.bellperson]
+git = "http://gitlab.forceup.in/ForceMining/bellman.git"
+branch = "force/master_v0.21.0"
+
+[patch.crates-io.merkletree]
+git = "http://gitlab.forceup.in/ForceMining/merkletree.git"
+branch = "force/master_0_21_0_20210123"
+
+[patch.crates-io.sha2]
+git = "http://gitlab.forceup.in/ForceMining/sha2.git"
+branch = "force/master_0_9_5_20210708"
