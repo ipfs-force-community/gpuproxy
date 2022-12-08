@@ -1,0 +1,18 @@
+stages:
+  - build
+variables:
+  GIT_SSL_NO_VERIFY: "true"
+  CC: "clang"
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+
+job-release-gpuproxy:
+  only:
+    - /^force/main$/
+    - /^force/test_.*$/
+  stage: build
+  image: harbor.forceup.in/lotus-build-runtime-env/lotus-compile-env:20210625-cuda
+  script:
+    - apt update && apt install -y ftp
+    - git config --global url."git@gitlab.forceup.in:".insteadOf "http://gitlab.forceup.in/"
+    - make build-procs-amd && make up2ftp-procs-amd
+    - make build-procs-intel && make up2ftp-procs-intel
