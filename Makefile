@@ -49,7 +49,7 @@ build-intel: CPU_PLATFORM=intel
 build-intel: build
 
 up2ftp-amd:
-    CPU_PLATFORM=amd ./up2ftp.sh all
+	CPU_PLATFORM=amd ./up2ftp.sh all
 
 up2ftp-intel:
-    CPU_PLATFORM=intel ./up2ftp.sh all
+	CPU_PLATFORM=intel ./up2ftp.sh all
