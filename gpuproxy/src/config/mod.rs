@@ -24,6 +24,7 @@ pub struct ServiceConfig {
 }
 
 impl ServiceConfig {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         url: String,
         db_dsn: String,
@@ -68,6 +69,7 @@ pub struct WorkerConfig {
 }
 
 impl WorkerConfig {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         url: String,
         db_dsn: String,

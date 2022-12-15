@@ -36,7 +36,7 @@ pub struct FileResource {
 
 impl FileResource {
     pub fn new(root: String) -> Self {
-        return FileResource { root };
+        FileResource { root }
     }
 }
 
@@ -47,13 +47,13 @@ unsafe impl Sync for FileResource {}
 impl Resource for FileResource {
     /// Check if the resource exit
     async fn has_resource(&self, resource_id: String) -> Result<bool> {
-        let new_path = Path::new(self.root.as_str()).join(resource_id.clone());
+        let new_path = Path::new(self.root.as_str()).join(resource_id);
         Ok(new_path.is_file())
     }
 
     /// get task resource by resource id
     async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
-        let new_path = Path::new(self.root.as_str()).join(resource_id.clone());
+        let new_path = Path::new(self.root.as_str()).join(resource_id);
         let content =
             fs::read(&new_path).with_context(|| format!("read file: {}", new_path.display()))?;
         Ok(Base64Byte::new(content))

@@ -11,9 +11,9 @@ impl Base64Byte {
     }
 }
 
-impl Into<Vec<u8>> for Base64Byte {
-    fn into(self) -> Vec<u8> {
-        self.0
+impl From<Base64Byte> for Vec<u8> {
+    fn from(v: Base64Byte) -> Vec<u8> {
+        v.0
     }
 }
 

@@ -1,4 +1,4 @@
-use sea_schema::migration::prelude::*;
+use sea_orm_migration::prelude::*;
 
 use entity::tasks as Tasks;
 use log::warn;

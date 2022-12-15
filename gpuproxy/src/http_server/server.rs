@@ -369,16 +369,9 @@ fn content_type_is_json(request: &hyper::Request<hyper::Body>) -> bool {
 
 /// Returns true if the `content_type` header indicates a valid JSON message.
 fn is_json(content_type: Option<&hyper::header::HeaderValue>) -> bool {
-    match content_type.and_then(|val| val.to_str().ok()) {
-        Some(content)
-            if content.eq_ignore_ascii_case("application/json")
-                || content.eq_ignore_ascii_case("application/json; charset=utf-8")
-                || content.eq_ignore_ascii_case("application/json;charset=utf-8") =>
-        {
-            true
-        }
-        _ => false,
-    }
+    matches!(content_type.and_then(|val| val.to_str().ok()), Some(content) if content.eq_ignore_ascii_case("application/json")
+               || content.eq_ignore_ascii_case("application/json; charset=utf-8")
+                || content.eq_ignore_ascii_case("application/json;charset=utf-8"))
 }
 
 /// Process a verified request, it implies a POST request with content type JSON.
@@ -439,15 +432,14 @@ async fn process_validated_request(
                     MethodKind::Async(callback) => {
                         match method_callback.claim(name, &resources) {
                             Ok(guard) => {
-                                let result = (callback)(
+                                (callback)(
                                     id.into_owned(),
                                     params.into_owned(),
                                     sink.clone(),
                                     0,
                                     Some(guard),
                                 )
-                                .await;
-                                result
+                                .await
                             }
                             Err(err) => {
                                 error!("[Methods::execute_with_resources] failed to lock resources: {:?}", err);

@@ -1,8 +1,7 @@
-use sea_schema::migration::prelude::*;
-
 use entity::resource_info as ResourceInfo;
 use entity::tasks as Tasks;
 use entity::worker_info as WorkerInfos;
+use sea_orm_migration::prelude::*;
 
 pub struct Migration;
 

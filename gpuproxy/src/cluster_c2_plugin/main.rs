@@ -11,7 +11,7 @@ use filecoin_proofs_api::seal::SealCommitPhase2Output;
 use serde_json::{from_str, to_string};
 use std::io::{stdin, stdout, Write};
 use storage_proofs_core::sector::SectorId;
-use tokio::time;
+use tokio::time::sleep;
 use tokio::time::Duration;
 
 use entity::{TaskState, TaskType};
@@ -39,17 +39,17 @@ pub struct C2Input {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Request<T> {
     pub id: u64,
-    pub data: T,
+    pub task: T,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Response<T> {
     pub id: u64,
     pub err_msg: Option<String>,
-    pub result: Option<T>,
+    pub output: Option<T>,
 }
 
-pub fn ready_msg(name: &str) -> String {
+fn ready_msg(name: &str) -> String {
     format!("{} processor ready", name)
 }
 
@@ -73,6 +73,7 @@ async fn main() {
                     Arg::new("poll-task-interval")
                         .long("poll-task-interval")
                         .env("C2PROXY_POLL_TASK_INTERVAL")
+                        .value_parser(clap::value_parser!(u64))
                         .default_value("60")
                         .help("interval for pool task status from gpuproxy server"),
                     Arg::new("log-level")
@@ -85,24 +86,22 @@ async fn main() {
         )
         .get_matches();
 
-    match app_m.subcommand() {
+    if let Err(e) = match app_m.subcommand() {
         Some(("run", ref sub_m)) => {
             cli::set_worker_env(sub_m);
 
-            let url: String = sub_m
-                .value_of_t("gpuproxy-url")
-                .unwrap_or_else(|e| e.exit());
-            let interval: u64 = sub_m
-                .value_of_t("poll-task-interval")
-                .unwrap_or_else(|e| e.exit());
+            let url: String = sub_m.get_one::<String>("gpuproxy-url").unwrap().clone();
+            let pool_task_interval: u64 = *sub_m.get_one::<u64>("poll-task-interval").unwrap();
 
             let cfg = C2PluginCfg {
                 url,
-                pool_task_interval: interval,
+                pool_task_interval,
             };
-            run(cfg).await.unwrap();
-        } // run was used
-        _ => {} // Either no subcommand or one not tested for...
+            run(cfg).await
+        }
+        _ => Ok(()),
+    } {
+        println!("exec cluster plugin error {e}")
     }
 }
 
@@ -148,7 +147,7 @@ async fn run(cfg: C2PluginCfg) -> Result<()> {
 
 async fn process_request(cfg: C2PluginCfg, req: Request<C2Input>) -> Result<()> {
     let id = req.id;
-    let input = req.data;
+    let input = req.task;
     trace!("input: {:?}", input);
 
     let params = Base64Byte(serde_json::to_vec(&input).context("unmarshal c2 input")?);
@@ -169,15 +168,15 @@ async fn process_request(cfg: C2PluginCfg, req: Request<C2Input>) -> Result<()> 
 
     let resp = match track_task_result(cfg, task_id, proxy_client).await {
         Ok(out) => Response {
-            id: id,
+            id,
             err_msg: None,
-            result: Some(out),
+            output: Some(out),
         },
 
         Err(e) => Response {
-            id: id,
+            id,
             err_msg: Some(format!("{:?}", e)),
-            result: None,
+            output: None,
         },
     };
 
@@ -198,19 +197,26 @@ async fn track_task_result(
 ) -> Result<SealCommitPhase2Output> {
     let duration = Duration::from_secs(cfg.pool_task_interval);
     loop {
-        let mut interval = time::interval(duration);
-        interval.tick().await;
-        let task = proxy_client.get_task(task_id.clone()).await?;
-        if task.state == TaskState::Error {
-            //发生错误 退出当前执行的任务
-            return Err(anyhow!(
-                "got task error while excuting task reason:{}",
-                task.error_msg
-            ));
-        } else if task.state == TaskState::Completed {
-            return Ok(SealCommitPhase2Output { proof: task.proof });
-        } else {
-            continue;
+        debug!("track task {task_id} {duration:?}");
+        sleep(duration).await;
+        match proxy_client.get_task(task_id.clone()).await {
+            Ok(task) => {
+                if task.state == TaskState::Error {
+                    //发生错误 退出当前执行的任务
+                    return Err(anyhow!(
+                        "got task error while excuting task reason:{}",
+                        task.error_msg
+                    ));
+                } else if task.state == TaskState::Completed {
+                    return Ok(SealCommitPhase2Output { proof: task.proof });
+                } else {
+                    continue;
+                }
+            }
+            Err(e) => {
+                error!("error {e} when track task {task_id}");
+                continue;
+            }
         }
     }
 }
