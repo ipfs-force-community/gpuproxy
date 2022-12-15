@@ -85,9 +85,8 @@ where
     E: Display,
 {
     fn log_error(self) {
-        match self {
-            Err(e) => error!("{}", e.to_string()),
-            _ => {}
+        if let Err(e) = self {
+            error!("{}", e.to_string())
         }
     }
 }

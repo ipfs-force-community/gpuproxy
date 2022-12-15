@@ -87,7 +87,7 @@ pub struct DbOpsImpl {
 
 impl DbOpsImpl {
     pub fn new(conn: DatabaseConnection) -> Self {
-        DbOpsImpl { conn: conn }
+        DbOpsImpl { conn }
     }
 }
 
@@ -137,7 +137,7 @@ impl WorkerFetch for DbOpsImpl {
                         undo_task_active.start_at = Set(Utc::now().timestamp());
                         undo_task_active.update(txn).await
                     } else {
-                        Err(DbErr::Query("no task to do for worker".to_owned()))
+                        Err(DbErr::RecordNotFound("no task to do for worker".to_owned()))
                     }
                 })
             })

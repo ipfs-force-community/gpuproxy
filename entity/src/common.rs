@@ -1,7 +1,6 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use sea_orm::entity::prelude::*;
 use serde_repr::*;
-use std::fmt;
 
 /// Used to indicate the state of the current task, the inner type is i32
 /// 0 Undefined old state
@@ -15,6 +14,7 @@ use std::fmt;
     Clone,
     Copy,
     PartialEq,
+    Eq,
     IntoPrimitive,
     TryFromPrimitive,
     Serialize_repr,
@@ -36,12 +36,6 @@ pub enum TaskState {
     Completed = 4,
 }
 
-impl fmt::Display for TaskState {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
-    }
-}
-
 /// The type of task, only c2 task supported for now
 #[repr(i32)]
 #[derive(
@@ -49,6 +43,7 @@ impl fmt::Display for TaskState {
     Clone,
     Copy,
     PartialEq,
+    Eq,
     IntoPrimitive,
     TryFromPrimitive,
     Serialize_repr,
@@ -60,10 +55,4 @@ impl fmt::Display for TaskState {
 pub enum TaskType {
     #[sea_orm(num_value = 0)]
     C2 = 0,
-}
-
-impl fmt::Display for TaskType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
-    }
 }

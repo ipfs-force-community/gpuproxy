@@ -3,7 +3,7 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// Task Model, Used to save task-related information, such as task status, type, parameters, and results
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[sea_orm(table_name = "tasks")]
 pub struct Model {

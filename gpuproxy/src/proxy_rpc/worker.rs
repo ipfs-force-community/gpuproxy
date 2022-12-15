@@ -69,7 +69,7 @@ impl Worker for LocalWorker {
                 let mut un_complete_task_result = fetcher
                     .fetch_uncompleted(worker_id.to_string())
                     .await
-                    .unwrap();
+                    .expect("unable to get not completed task, check gpuproxy server config correct ");
                 let mut interval = time::interval(Duration::from_secs(10));
                 loop {
                     interval.tick().await;
@@ -83,7 +83,7 @@ impl Worker for LocalWorker {
                     }
 
                     let select_task: Task;
-                    if un_complete_task_result.len() > 0 {
+                    if !un_complete_task_result.is_empty() {
                         select_task = un_complete_task_result.pop().unwrap();
                     } else {
                         match fetcher
@@ -114,7 +114,6 @@ impl Worker for LocalWorker {
         {
             let worker_id = self.worker_id.clone();
             let fetcher = fetcher.clone();
-            let count_clone = count.clone();
             let (result_tx, mut result_rx) = channel(1);
             tokio::spawn(async move {
                 info!(
@@ -133,7 +132,7 @@ impl Worker for LocalWorker {
                                         let resource_result = self.resource.get_resource_info(resource_id.clone()).await;
                                         if let Err(e) = resource_result {
                                             error!("unable to get resource of {}, reason:{}", resource_id.clone(), e.to_string());
-                                            count_clone.fetch_sub(1, Ordering::SeqCst);
+                                            count.fetch_sub(1, Ordering::SeqCst);
                                             continue;
                                         }
                                         let resource: Vec<u8> = resource_result.unwrap().into();
@@ -158,7 +157,7 @@ impl Worker for LocalWorker {
                         val = result_rx.recv() => {
                                debug!("receive excute result from channel");
                                defer! {
-                                        count_clone.fetch_sub(1, Ordering::SeqCst);
+                                        count.fetch_sub(1, Ordering::SeqCst);
                                }
                                if let Some((undo_task, exec_result)) = val {
                                     match exec_result {

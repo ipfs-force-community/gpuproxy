@@ -1,15 +1,17 @@
 use crate::db_ops::*;
 use crate::worker::Worker;
 
-use clap::{Arg, Command};
+use anyhow::{anyhow, Result};
+use clap::{Arg, ArgAction, ArgMatches, Command};
 use entity::TaskType;
 use gpuproxy::cli;
 use gpuproxy::config::*;
 use gpuproxy::proxy_rpc::*;
 use gpuproxy::resource;
 use log::*;
-use migration::{Migrator, MigratorTrait};
+use migration::Migrator;
 use sea_orm::{ConnectOptions, Database};
+use sea_orm_migration::migrator::MigratorTrait;
 use simplelog::*;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -39,6 +41,7 @@ async fn main() {
                     Arg::new("max-tasks")
                         .long("max-tasks")
                         .env("C2PROXY_MAX_TASKS")
+                        .value_parser(clap::value_parser!(usize))
                         .default_value("1")
                         .help("number of c2 task to run parallelly"),
                     Arg::new("log-level")
@@ -50,7 +53,9 @@ async fn main() {
                         .long("resource-type")
                         .env("C2PROXY_RESOURCE_TYPE")
                         .default_value("fs")
-                        .help("resource type(db(only for test, have bug in seaorm to save longblob), fs)"),
+                        .help(
+                            "resource type(db(only for test, have bug for executing too long sql), fs)",
+                        ),
                     Arg::new("fs-resource-path")
                         .long("fs-resource-path")
                         .env("C2PROXY_FS_RESOURCE_PATH")
@@ -66,98 +71,114 @@ async fn main() {
                         .env("C2PROXY_DEBUG_SQL")
                         .required(false)
                         .takes_value(false)
-                        .default_value("false")
+                        .action(ArgAction::SetFalse)
                         .help("print sql to debug issue"),
                 ])
                 .args(worker_args),
         )
         .get_matches();
 
-    match app_m.subcommand() {
-        Some(("run", ref sub_m)) => {
-            cli::set_worker_env(sub_m);
-
-            let url: String = sub_m
-                .value_of_t("gpuproxy-url")
-                .unwrap_or_else(|e| e.exit());
-            let max_tasks: usize = sub_m.value_of_t("max-tasks").unwrap_or_else(|e| e.exit());
-            let db_dsn: String = sub_m.value_of_t("db-dsn").unwrap_or_else(|e| e.exit());
-            let log_level: String = sub_m.value_of_t("log-level").unwrap_or_else(|e| e.exit());
-            let debug_sql: bool = sub_m.value_of_t("debug-sql").unwrap_or_else(|e| e.exit());
-            let resource_type: String = sub_m
-                .value_of_t("resource-type")
-                .unwrap_or_else(|e| e.exit());
-            let fs_resource_type: String = sub_m
-                .value_of_t("fs-resource-path")
-                .unwrap_or_else(|e| e.exit());
-            let allow_types = if sub_m.is_present("allow-type") {
-                let values = sub_m
-                    .values_of_t::<i32>("allow-type")
-                    .unwrap_or_else(|e| e.exit())
-                    .into_iter()
-                    .map(|e| TaskType::try_from(e).unwrap())
-                    .collect();
-                Some(values)
-            } else {
-                None
-            };
-
-            let cfg = WorkerConfig::new(
-                url,
-                db_dsn,
-                max_tasks,
-                resource_type,
-                fs_resource_type,
-                log_level,
-                allow_types,
-                debug_sql,
-            );
-
-            let lv = LevelFilter::from_str(cfg.log_level.as_str()).unwrap();
-            TermLogger::init(
-                lv,
-                Config::default(),
-                TerminalMode::Mixed,
-                ColorChoice::Auto,
-            )
-            .unwrap();
-
-            let mut opt = ConnectOptions::new(cfg.db_dsn);
-            opt.max_connections(10)
-                .min_connections(5)
-                .sqlx_logging(cfg.debug_sql);
-
-            let db_conn = Database::connect(opt).await.unwrap();
-            Migrator::up(&db_conn, None).await.unwrap();
-
-            let db_ops = db_ops::DbOpsImpl::new(db_conn);
-            let worker_id = db_ops.get_worker_id().await.unwrap();
-
-            let worker_api = Arc::new(rpc::get_proxy_api(cfg.url).await.unwrap());
-            let resource: Arc<dyn resource::Resource + Send + Sync> = match cfg.resource {
-                Resource::Db => worker_api.clone(),
-                Resource::FS(path) => Arc::new(resource::FileResource::new(path)),
-            };
-
-            let worker = worker::LocalWorker::new(
-                cfg.max_tasks,
-                worker_id.to_string(),
-                cfg.allow_types,
-                resource,
-                worker_api,
-            );
-            worker.process_tasks().await;
-            info!("ready for local worker address worker_id {}", worker_id);
-            let mut sig_int = signal(SignalKind::interrupt()).unwrap();
-            let mut sig_term = signal(SignalKind::terminate()).unwrap();
-
-            tokio::select! {
-                _ = sig_int.recv() => info!("receive SIGINT"),
-                _ = sig_term.recv() => info!("receive SIGTERM"),
-                _ = ctrl_c() => info!("receive Ctrl C"),
-            }
-            info!("Shutdown program");
-        } // run was used
-        _ => {} // Either no subcommand or one not tested for...
+    if let Err(e) = match app_m.subcommand() {
+        Some(("run", ref sub_m)) => run_worker(sub_m).await,
+        _ => Ok(()),
+    } {
+        println!("exec worker error {e}");
     }
+}
+
+async fn run_worker(sub_m: &&ArgMatches) -> Result<()> {
+    cli::set_worker_env(sub_m);
+
+    let url = sub_m
+        .get_one::<String>("gpuproxy-url")
+        .ok_or_else(|| anyhow!("gpuproxy url flag not found"))?
+        .clone();
+    let max_tasks = *sub_m
+        .get_one::<usize>("max-tasks")
+        .ok_or_else(|| anyhow!("max-tasks flag not found"))?;
+    let db_dsn = sub_m
+        .get_one::<String>("db-dsn")
+        .ok_or_else(|| anyhow!("db-dsn flag not found"))?
+        .clone();
+    let log_level = sub_m
+        .get_one::<String>("log-level")
+        .ok_or_else(|| anyhow!("log-level flag not found"))?
+        .clone();
+    let debug_sql = *sub_m
+        .get_one::<bool>("debug-sql")
+        .ok_or_else(|| anyhow!("debug-sql flag not found"))?;
+    let resource_type = sub_m
+        .get_one::<String>("resource-type")
+        .ok_or_else(|| anyhow!("resource-type flag not found"))?
+        .clone();
+    let fs_resource_type = sub_m
+        .get_one::<String>("fs-resource-path")
+        .ok_or_else(|| anyhow!("fs-resource-path flag not found"))?
+        .clone();
+    let allow_types = if sub_m.contains_id("allow-type") {
+        let values = sub_m
+            .get_many::<i32>("allow-type")
+            .unwrap()
+            .copied()
+            .map(|e| TaskType::try_from(e).unwrap())
+            .collect();
+        Some(values)
+    } else {
+        None
+    };
+
+    let cfg = WorkerConfig::new(
+        url,
+        db_dsn,
+        max_tasks,
+        resource_type,
+        fs_resource_type,
+        log_level,
+        allow_types,
+        debug_sql,
+    );
+
+    let lv = LevelFilter::from_str(cfg.log_level.as_str())?;
+    TermLogger::init(
+        lv,
+        Config::default(),
+        TerminalMode::Mixed,
+        ColorChoice::Auto,
+    )?;
+
+    let mut opt = ConnectOptions::new(cfg.db_dsn);
+    opt.max_connections(10)
+        .min_connections(5)
+        .sqlx_logging(cfg.debug_sql);
+
+    let db_conn = Database::connect(opt).await?;
+    Migrator::up(&db_conn, None).await?;
+    let db_ops = db_ops::DbOpsImpl::new(db_conn);
+    let worker_id = db_ops.get_worker_id().await?;
+
+    let worker_api = Arc::new(rpc::get_proxy_api(cfg.url).await?);
+    let resource: Arc<dyn resource::Resource + Send + Sync> = match cfg.resource {
+        Resource::Db => worker_api.clone(),
+        Resource::FS(path) => Arc::new(resource::FileResource::new(path)),
+    };
+
+    let worker = worker::LocalWorker::new(
+        cfg.max_tasks,
+        worker_id.to_string(),
+        cfg.allow_types,
+        resource,
+        worker_api,
+    );
+    worker.process_tasks().await;
+    info!("ready for local worker address worker_id {}", worker_id);
+    let mut sig_int = signal(SignalKind::interrupt())?;
+    let mut sig_term = signal(SignalKind::terminate())?;
+
+    tokio::select! {
+        _ = sig_int.recv() => info!("receive SIGINT"),
+        _ = sig_term.recv() => info!("receive SIGTERM"),
+        _ = ctrl_c() => info!("receive Ctrl C"),
+    }
+    info!("Shutdown program");
+    Ok(())
 }
