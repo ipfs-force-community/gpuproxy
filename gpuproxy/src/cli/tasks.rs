@@ -122,9 +122,9 @@ fn print_task(tasks: Vec<Task>) -> Result<()> {
             task.state.to_string().as_str(),
             task.resource_id.as_str(),
             task.error_msg.as_str(),
-            unit_time(task.create_at)?.as_str(),
-            unit_time(task.start_at)?.as_str(),
-            unit_time(task.complete_at)?.as_str(),
+            unit_time(task.create_at).as_str(),
+            unit_time(task.start_at).as_str(),
+            unit_time(task.complete_at).as_str(),
         ]);
     }
 

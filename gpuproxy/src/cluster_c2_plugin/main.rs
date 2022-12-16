@@ -1,24 +1,27 @@
-use clap::{Arg, Command};
-use gpuproxy::cli;
-use gpuproxy::proxy_rpc::rpc::GpuServiceRpcClient;
-use gpuproxy::proxy_rpc::rpc::WrapClient;
-use log::*;
+use std::ops::DerefMut;
+use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
+use clap::{Arg, Command};
+use entity::{TaskState, TaskType};
+use fil_types::ActorID;
 use filecoin_proofs::ProverId;
 use filecoin_proofs_api::seal::SealCommitPhase1Output;
 use filecoin_proofs_api::seal::SealCommitPhase2Output;
-use serde_json::{from_str, to_string};
-use std::io::{stdin, stdout, Write};
-use storage_proofs_core::sector::SectorId;
-use tokio::time::sleep;
-use tokio::time::Duration;
-
-use entity::{TaskState, TaskType};
-use fil_types::ActorID;
+use gpuproxy::cli;
 use gpuproxy::proxy_rpc::rpc::get_proxy_api;
+use gpuproxy::proxy_rpc::rpc::GpuServiceRpcClient;
+use gpuproxy::proxy_rpc::rpc::WrapClient;
 use gpuproxy::utils::Base64Byte;
+use log::*;
 use serde::{Deserialize, Serialize};
+use serde_json::{from_str, to_string};
+use storage_proofs_core::sector::SectorId;
+use tokio::{
+    io::{self, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader, BufWriter},
+    sync::Mutex,
+    time::{sleep, Duration},
+};
 use tracing::info_span;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -50,7 +53,7 @@ struct Response<T> {
 }
 
 fn ready_msg(name: &str) -> String {
-    format!("{} processor ready", name)
+    format!("{} processor ready\n", name)
 }
 
 #[tokio::main]
@@ -108,25 +111,20 @@ async fn main() {
 async fn run(cfg: C2PluginCfg) -> Result<()> {
     let c2_stage_name = "c2";
 
-    let mut output = stdout();
-    writeln!(output, "{}", ready_msg(c2_stage_name))?;
+    let mut stdout = BufWriter::new(io::stdout());
+
+    write_all(&mut stdout, ready_msg(c2_stage_name).as_bytes()).await?;
 
     let pid = std::process::id();
     let span = info_span!("sub", c2_stage_name, pid);
     let _guard = span.enter();
 
-    let mut line = String::new();
-    let input = stdin();
+    let output = Arc::new(Mutex::new(stdout));
+    let mut input = BufReader::new(io::stdin()).lines();
 
     info!("stage {}, pid {} processor ready", c2_stage_name, pid);
-    loop {
-        debug!("waiting for new incoming line");
-        line.clear();
-        let size = input.read_line(&mut line)?;
-        if size == 0 {
-            return Err(anyhow!("got empty line, parent might be out"));
-        }
 
+    while let Some(line) = input.next_line().await.context("read line from stdin")? {
         let req: Request<C2Input> = match from_str(&line).context("unmarshal request") {
             Ok(r) => r,
             Err(e) => {
@@ -135,17 +133,25 @@ async fn run(cfg: C2PluginCfg) -> Result<()> {
             }
         };
 
-        debug!("process request id {}, size {}", req.id, size);
+        debug!("process request id {}, size {}", req.id, line.len());
         let cfg_clone = cfg.clone();
+
+        let output_cloned = output.clone();
         tokio::spawn(async move {
-            if let Err(e) = process_request(cfg_clone, req).await {
+            if let Err(e) = process_request(cfg_clone, req, output_cloned).await {
                 error!("failed: {:?}", e);
             }
         });
     }
+
+    Err(anyhow!("got empty line, parent might be out"))
 }
 
-async fn process_request(cfg: C2PluginCfg, req: Request<C2Input>) -> Result<()> {
+async fn process_request(
+    cfg: C2PluginCfg,
+    req: Request<C2Input>,
+    output: Arc<Mutex<impl AsyncWrite + Unpin>>,
+) -> Result<()> {
     let id = req.id;
     let input = req.task;
     trace!("input: {:?}", input);
@@ -180,12 +186,12 @@ async fn process_request(cfg: C2PluginCfg, req: Request<C2Input>) -> Result<()> 
         },
     };
 
-    let res_str = to_string(&resp).context("marshal response")?;
-    let sout = stdout();
-    let mut output = sout.lock();
-    writeln!(output, "{}", res_str)?;
-    drop(output);
-
+    let mut res_str = to_string(&resp).context("marshal response")?;
+    res_str.push('\n');
+    let mut output = output.lock().await;
+    write_all(output.deref_mut(), res_str.as_bytes())
+        .await
+        .context("write response to stdout")?;
     debug!("response written");
     Ok(())
 }
@@ -219,4 +225,10 @@ async fn track_task_result(
             }
         }
     }
+}
+
+#[inline]
+async fn write_all<W: AsyncWrite + Unpin>(w: &mut W, data: &[u8]) -> io::Result<()> {
+    w.write_all(data).await?;
+    w.flush().await
 }
