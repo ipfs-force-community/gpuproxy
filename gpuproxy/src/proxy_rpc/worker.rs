@@ -69,7 +69,9 @@ impl Worker for LocalWorker {
                 let mut un_complete_task_result = fetcher
                     .fetch_uncompleted(worker_id.to_string())
                     .await
-                    .expect("unable to get not completed task, check gpuproxy server config correct ");
+                    .expect(
+                        "unable to get not completed task, check gpuproxy server config correct ",
+                    );
                 let mut interval = time::interval(Duration::from_secs(10));
                 loop {
                     interval.tick().await;
