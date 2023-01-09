@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use anyhow::Result;
+use clap::value_parser;
 use std::borrow::{Borrow, BorrowMut};
 use std::convert::TryFrom;
 use std::fmt::format;
@@ -24,6 +25,7 @@ pub async fn list_task_cmds<'a>() -> Command<'a> {
                     .long("state")
                     .multiple_values(true)
                     .takes_value(true)
+                    .value_parser(value_parser!(i32))
                     .help("Init = 1\nRunning = 2\nError = 3\nCompleted = 4")]),
         )
         .subcommand(

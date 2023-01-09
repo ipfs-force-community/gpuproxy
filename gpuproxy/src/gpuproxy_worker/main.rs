@@ -2,6 +2,7 @@ use crate::db_ops::*;
 use crate::worker::Worker;
 
 use anyhow::{anyhow, Result};
+use clap::value_parser;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use entity::TaskType;
 use gpuproxy::cli;
@@ -65,6 +66,7 @@ async fn main() {
                         .long("allow-type")
                         .multiple_values(true)
                         .takes_value(true)
+                        .value_parser(value_parser!(i32))
                         .help("task types that worker support (c2 = 0)"),
                     Arg::new("debug-sql")
                         .long("debug-sql")

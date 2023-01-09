@@ -1,6 +1,6 @@
 use crate::cli::params_fetch;
 use anyhow::{anyhow, Result};
-use clap::{Arg, ArgAction, ArgMatches, Command};
+use clap::{Arg, ArgAction, ArgMatches, Command, value_parser};
 
 pub async fn fetch_params_cmds<'a>() -> Command<'a> {
     Command::new("paramfetch")
@@ -10,6 +10,7 @@ pub async fn fetch_params_cmds<'a>() -> Command<'a> {
             .action(ArgAction::Append)
             .multiple_values(true)
             .takes_value(true)
+            .value_parser(value_parser!(u64))
             .env("C2PROXY_SECTOR_SIZE")
             .help("specify size of params to fetch")])
 }
