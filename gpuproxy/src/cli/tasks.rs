@@ -42,6 +42,7 @@ pub async fn list_task_cmds<'a>() -> Command<'a> {
                         .long("state")
                         .required(true)
                         .takes_value(true)
+                        .value_parser(value_parser!(i32))
                         .help("Init = 1\nRunning = 2\nError = 3\nCompleted = 4"),
                 ]),
         )
