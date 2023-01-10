@@ -1,9 +1,13 @@
 use anyhow::anyhow;
+use bytes::BufMut;
+use bytes::BytesMut;
+use entity::TaskType;
 use jsonrpsee::types::error::{CallError, ErrorCode};
 use jsonrpsee_core::Error::Call;
 use log::error;
 use std::fmt::Display;
 use std::pin::Pin;
+use uuid::Uuid;
 
 mod base64bytes;
 pub use base64bytes::Base64Byte;
@@ -89,4 +93,21 @@ where
             error!("{}", e.to_string())
         }
     }
+}
+
+pub fn gen_resource_id(resource_bytes: &[u8]) -> String {
+    Uuid::new_v5(&Uuid::NAMESPACE_OID, resource_bytes).to_string()
+}
+
+pub fn gen_task_id(
+    addr: forest_address::Address,
+    task_type: TaskType,
+    resource_bytes: &[u8],
+) -> String {
+    let resource_id = gen_resource_id(resource_bytes);
+    let mut buf = BytesMut::new();
+    buf.put_slice(&addr.payload_bytes());
+    buf.put_i32(task_type.into());
+    buf.put_slice(resource_id.as_bytes());
+    Uuid::new_v5(&Uuid::NAMESPACE_OID, buf.as_ref()).to_string()
 }

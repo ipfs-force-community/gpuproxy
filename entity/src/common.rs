@@ -1,7 +1,6 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use sea_orm::entity::prelude::*;
 use serde_repr::*;
-
 /// Used to indicate the state of the current task, the inner type is i32
 /// 0 Undefined old state
 /// 1 Init every new task should be init
@@ -24,6 +23,7 @@ use serde_repr::*;
 )]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum TaskState {
+    //todo try to implement to_string
     #[sea_orm(num_value = 0)]
     Undefined = 0,
     #[sea_orm(num_value = 1)]

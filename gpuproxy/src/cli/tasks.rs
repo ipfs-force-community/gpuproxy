@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 use crate::proxy_rpc::rpc::{get_proxy_api, GpuServiceRpcClient};
 use chrono::{DateTime, Local, LocalResult, NaiveDateTime, TimeZone, Utc};
-use clap::{Arg, ArgMatches, Command};
+use clap::{Arg, ArgAction, ArgMatches, Command};
 use entity::tasks::Model as Task;
 use entity::{TaskState, TaskType};
 use tabled::{builder::Builder, Style};
@@ -32,18 +32,18 @@ pub async fn list_task_cmds<'a>() -> Command<'a> {
             Command::new("update-state")
                 .about("update status of task")
                 .args(&[
-                    Arg::new("id")
-                        .long("id")
-                        .multiple_values(true)
-                        .takes_value(true)
-                        .required(true)
-                        .help("id slice of id"),
                     Arg::new("state")
                         .long("state")
                         .required(true)
                         .takes_value(true)
                         .value_parser(value_parser!(i32))
                         .help("Init = 1\nRunning = 2\nError = 3\nCompleted = 4"),
+                    Arg::new("id")
+                        .last(true)
+                        .multiple_values(true)
+                        .takes_value(true)
+                        .required(true)
+                        .help("id slice of id"),
                 ]),
         )
 }
@@ -122,7 +122,7 @@ fn print_task(tasks: Vec<Task>) -> Result<()> {
             task.id.as_str(),
             task.miner.as_str(),
             task.task_type.to_string().as_str(),
-            task.state.to_string().as_str(),
+            state_to_string(task.state).as_str(),
             task.resource_id.as_str(),
             task.error_msg.as_str(),
             unit_time(task.create_at).as_str(),
@@ -141,5 +141,15 @@ fn unit_time(tm: i64) -> String {
         LocalResult::None => "".to_string(),
         LocalResult::Single(v) => v.to_string(),
         LocalResult::Ambiguous(v1, v2) => format!("{}, {}", v1, v2),
+    }
+}
+
+fn state_to_string(state: TaskState) -> String {
+    match state {
+        TaskState::Undefined => "Undefined".to_string(),
+        TaskState::Init => "Init".to_string(),
+        TaskState::Running => "Running".to_string(),
+        TaskState::Error => "Error".to_string(),
+        TaskState::Completed => "Completed".to_string(),
     }
 }

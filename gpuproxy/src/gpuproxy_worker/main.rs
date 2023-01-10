@@ -72,9 +72,8 @@ async fn main() {
                         .long("debug-sql")
                         .env("C2PROXY_DEBUG_SQL")
                         .required(false)
-                        .takes_value(false)
-                        .action(ArgAction::SetFalse)
-                        .help("print sql to debug issue"),
+                        .action(ArgAction::SetTrue)
+                        .help("print sql to debug"),
                 ])
                 .args(worker_args),
         )

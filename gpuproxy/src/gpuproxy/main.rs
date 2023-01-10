@@ -86,8 +86,7 @@ async fn main() {
                         .long("debug-sql")
                         .env("C2PROXY_DEBUG_SQL")
                         .required(false)
-                        .takes_value(false)
-                        .action(ArgAction::SetFalse)
+                        .action(ArgAction::SetTrue)
                         .help("print sql to debug"),
                 ])
                 .args(worker_args),
@@ -103,7 +102,9 @@ async fn main() {
         _ => Ok(()), // Either no subcommand or one not tested for...
     };
 
-    println!("{:?}", exec_result);
+    if let Err(e) = exec_result {
+        println!("{:?}", e);
+    }
 }
 
 async fn start_server(sub_m: &&ArgMatches) -> Result<()> {
