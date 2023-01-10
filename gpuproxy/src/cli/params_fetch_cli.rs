@@ -1,6 +1,6 @@
 use crate::cli::params_fetch;
 use anyhow::{anyhow, Result};
-use clap::{Arg, ArgAction, ArgMatches, Command, value_parser};
+use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
 
 pub async fn fetch_params_cmds<'a>() -> Command<'a> {
     Command::new("paramfetch")

@@ -8,11 +8,11 @@ use fil_types::ActorID;
 use filecoin_proofs::ProverId;
 use filecoin_proofs_api::seal::SealCommitPhase1Output;
 use filecoin_proofs_api::seal::SealCommitPhase2Output;
-use gpuproxy::cli;
 use gpuproxy::proxy_rpc::rpc::get_proxy_api;
 use gpuproxy::proxy_rpc::rpc::GpuServiceRpcClient;
 use gpuproxy::proxy_rpc::rpc::WrapClient;
 use gpuproxy::utils::Base64Byte;
+use gpuproxy::{cli, utils};
 use log::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
@@ -22,7 +22,6 @@ use tokio::{
     sync::Mutex,
     time::{sleep, Duration},
 };
-use tracing::info_span;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct C2PluginCfg {
@@ -116,9 +115,6 @@ async fn run(cfg: C2PluginCfg) -> Result<()> {
     write_all(&mut stdout, ready_msg(c2_stage_name).as_bytes()).await?;
 
     let pid = std::process::id();
-    let span = info_span!("sub", c2_stage_name, pid);
-    let _guard = span.enter();
-
     let output = Arc::new(Mutex::new(stdout));
     let mut input = BufReader::new(io::stdin()).lines();
 
@@ -153,26 +149,67 @@ async fn process_request(
     output: Arc<Mutex<impl AsyncWrite + Unpin>>,
 ) -> Result<()> {
     let id = req.id;
+    let sector_id = req.task.sector_id;
     let input = req.task;
+
     trace!("input: {:?}", input);
 
-    let params = Base64Byte(serde_json::to_vec(&input).context("unmarshal c2 input")?);
-    let miner_addr = forest_address::Address::new_id(input.miner_id).to_string();
+    let params_bytes = serde_json::to_vec(&input).context("unmarshal c2 input")?;
+    let miner_addr = forest_address::Address::new_id(input.miner_id);
 
     let proxy_client = get_proxy_api(cfg.url.clone())
         .await
         .context("connect gpu proxy url")?;
-    let task_id = proxy_client
-        .add_task(miner_addr, TaskType::C2, params)
-        .await
-        .context("add task")?;
 
-    info!(
-        "miner_id {} submit task {} successfully",
-        input.miner_id, task_id
-    );
+    let task_id = utils::gen_task_id(miner_addr, TaskType::C2, &params_bytes);
+    let task_result = proxy_client.get_task(task_id.clone()).await;
+    match task_result {
+        Ok(task) => {
+            //write before check task status, and reset task if task is in Error state
+            if task.state == TaskState::Error {
+                proxy_client
+                    .update_status_by_id(vec![task_id.clone()], TaskState::Init)
+                    .await?;
+                info!(
+                    "reset failed task miner_id {} task_id {}, sector_id {}",
+                    input.miner_id,
+                    task_id.clone(),
+                    sector_id.clone()
+                );
+            } else {
+                info!(
+                    "trace exit task miner_id {} task_id {}, sector_id {}",
+                    input.miner_id,
+                    task_id.clone(),
+                    sector_id.clone()
+                );
+            }
+        }
+        Err(e) => {
+            let err_msg = e.to_string();
+            if err_msg.contains("not found") {
+                //write new record
+                proxy_client
+                    .add_task(
+                        miner_addr.to_string(),
+                        TaskType::C2,
+                        Base64Byte(params_bytes),
+                    )
+                    .await
+                    .context("add task")?;
+                info!(
+                    "create new task miner_id {}  task_id{} sector_id {} successfully",
+                    input.miner_id,
+                    task_id.clone(),
+                    sector_id
+                );
+            } else {
+                return Err(e);
+            }
+        }
+    }
 
-    let resp = match track_task_result(cfg, task_id, proxy_client).await {
+    let resp = match trace_task_result(cfg, sector_id, task_id, proxy_client).await {
         Ok(out) => Response {
             id,
             err_msg: None,
@@ -196,21 +233,24 @@ async fn process_request(
     Ok(())
 }
 
-async fn track_task_result(
+async fn trace_task_result(
     cfg: C2PluginCfg,
+    sector_id: SectorId,
     task_id: String,
     proxy_client: WrapClient,
 ) -> Result<SealCommitPhase2Output> {
     let duration = Duration::from_secs(cfg.pool_task_interval);
     loop {
-        debug!("track task {task_id} {duration:?}");
+        debug!("trace task {task_id} {duration:?}");
         sleep(duration).await;
         match proxy_client.get_task(task_id.clone()).await {
             Ok(task) => {
                 if task.state == TaskState::Error {
                     //发生错误 退出当前执行的任务
                     return Err(anyhow!(
-                        "got task error while excuting task reason:{}",
+                        "task {} sector {} error reason:{}",
+                        task.id,
+                        sector_id,
                         task.error_msg
                     ));
                 } else if task.state == TaskState::Completed {
@@ -220,7 +260,7 @@ async fn track_task_result(
                 }
             }
             Err(e) => {
-                error!("error {e} when track task {task_id}");
+                error!("error {e} when trace task {task_id} {sector_id}");
                 continue;
             }
         }

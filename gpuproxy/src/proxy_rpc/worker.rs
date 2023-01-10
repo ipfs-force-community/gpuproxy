@@ -196,7 +196,6 @@ async fn c2(resource: Vec<u8>) -> anyhow::Result<SealCommitPhase2Output> {
     let join_result = tokio::task::spawn_blocking(move || {
         let c2_resource: C2Resource =
             serde_json::from_slice(&resource).context("deserialize c2 resource")?;
-
         info!(
             "start to do c2 task. size: {}",
             u64::from(c2_resource.c1out.registered_proof.sector_size())

@@ -2,15 +2,15 @@ use crate::proxy_rpc::db_ops::*;
 use filecoin_proofs_api::{ProverId, SectorId};
 use std::str::FromStr;
 
-use crate::resource;
 use crate::utils::Base64Byte;
 use crate::utils::{IntoAnyhow, IntoJsonRpcResult, ReveseOption};
+use crate::{resource, utils};
 use anyhow::anyhow;
-use bytes::BufMut;
 use entity::tasks as Tasks;
 use entity::worker_info as WorkerInfos;
 use entity::TaskType;
 use entity::{resource_info as ResourceInfos, TaskState};
+use hyper::Uri;
 use jsonrpsee::core::{async_trait, client::Subscription, RpcResult};
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use jsonrpsee::proc_macros::rpc;
@@ -102,21 +102,16 @@ impl ProxyImpl {
         task_type: TaskType,
         resource_bytes: Vec<u8>,
     ) -> RpcResult<String> {
-        let resource_id = Uuid::new_v5(&Uuid::NAMESPACE_OID, &resource_bytes).to_string();
+        let resource_id = utils::gen_resource_id(&resource_bytes);
         if !self.resource.has_resource(resource_id.clone()).await? {
             let _ = self
                 .resource
-                .store_resource_info(resource_id.clone(), resource_bytes)
+                .store_resource_info(resource_id.clone(), resource_bytes.clone())
                 .await
                 .internal_call_error()?;
         }
 
-        let mut buf = bytes::BytesMut::new();
-        buf.put_slice(&addr.payload_bytes());
-        buf.put_i32(task_type.into());
-        buf.put_slice(resource_id.clone().as_bytes());
-        let task_id = Uuid::new_v5(&Uuid::NAMESPACE_OID, buf.as_ref()).to_string();
-
+        let task_id = utils::gen_task_id(addr, task_type, &resource_bytes);
         if !self.pool.has_task(task_id.clone()).await? {
             self.pool
                 .clone()
@@ -266,9 +261,16 @@ pub fn register(
 
 /// get proxy api by url
 pub async fn get_proxy_api(url: String) -> anyhow::Result<WrapClient> {
+    let uri = Uri::from_str(&url)?;
+    let new_url = if uri.scheme().is_none() {
+        "http://".to_owned() + &url
+    } else {
+        url
+    };
+
     HttpClientBuilder::default()
         .max_request_body_size(ONE_GIB)
-        .build(url.as_str())
+        .build(new_url.as_str())
         .map(|val| WrapClient { client: val })
         .anyhow()
 }

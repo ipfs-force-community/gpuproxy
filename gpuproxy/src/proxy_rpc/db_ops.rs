@@ -189,6 +189,7 @@ impl WorkerFetch for DbOpsImpl {
             .col_expr(Tasks::Column::State, Expr::value(TaskState::Completed))
             .col_expr(Tasks::Column::WorkerId, Expr::value(worker_id_arg.clone()))
             .col_expr(Tasks::Column::Proof, Expr::value(proof_str))
+            .col_expr(Tasks::Column::ErrorMsg, Expr::value(""))
             .col_expr(
                 Tasks::Column::CompleteAt,
                 Expr::value(Utc::now().timestamp()),
