@@ -56,3 +56,10 @@ pub enum TaskType {
     #[sea_orm(num_value = 0)]
     C2 = 0,
 }
+
+//todo add to_string in task type
+pub fn task_type_to_string(t: TaskType) -> String {
+    match t {
+        TaskType::C2 => "C2".to_owned(),
+    }
+}

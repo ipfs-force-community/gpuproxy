@@ -3,10 +3,11 @@ use crate::resource::{C2Resource, Resource};
 use crate::utils::*;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use entity::resource_info as ResourceInfos;
+use core::cmp::Ordering as CmpOrdering;
 use entity::tasks as Tasks;
 use entity::worker_info as WorkerInfos;
 use entity::TaskType;
+use entity::{resource_info as ResourceInfos, task_type_to_string};
 use filecoin_proofs_api::seal::{
     seal_commit_phase2, SealCommitPhase1Output, SealCommitPhase2Output,
 };
@@ -23,6 +24,7 @@ use WorkerInfos::Model as WorkerInfo;
 /// GPU worker used to execute specify task
 #[async_trait]
 pub trait Worker {
+    async fn register(&self, manual_ip: Option<String>) -> Result<()>;
     async fn process_tasks(self);
 }
 
@@ -53,16 +55,67 @@ impl LocalWorker {
     }
 }
 
+const LOOP_BACK_ADDR: &[&str] = &["0:0:0:0:0:0:0:1", "::1", "127.0.0.1"];
+
 #[async_trait]
 impl Worker for LocalWorker {
+    async fn register(&self, manual_ip: Option<String>) -> Result<()> {
+        let support_types = match &self.allow_types {
+            Some(types) => types
+                .iter()
+                .map(|t| t.to_string())
+                .collect::<Vec<String>>()
+                .join("|"),
+            None => "".to_string(),
+        };
+
+        let ips = match manual_ip {
+            Some(manual_ip) => manual_ip,
+            None => {
+                let mut ip_vec = local_ip_address::list_afinet_netifas()?;
+                ip_vec.sort_by(|a, b| {
+                    if a.1.is_ipv4() && b.1.is_ipv6() {
+                        return CmpOrdering::Less;
+                    }
+                    if a.1.is_ipv6() && b.1.is_ipv4() {
+                        return CmpOrdering::Greater;
+                    }
+                    CmpOrdering::Equal
+                });
+                ip_vec
+                    .iter()
+                    .filter(|v| !LOOP_BACK_ADDR.contains(&v.1.to_string().as_str()))
+                    .map(|ip| ip.1.to_string())
+                    .collect::<Vec<String>>()
+                    .join("|")
+            }
+        };
+
+        let worker_id = self.worker_id.clone();
+        let fetcher = self.task_fetcher.clone();
+        tokio::spawn(async move {
+            let mut interval = time::interval(Duration::from_secs(60));
+            loop {
+                if let Err(err) = fetcher
+                    .report_worker_info(worker_id.clone(), ips.clone(), support_types.clone())
+                    .await
+                {
+                    error!("unable to report worker status {}", err)
+                }
+
+                interval.tick().await;
+            }
+        });
+        Ok(())
+    }
+
     async fn process_tasks(self) {
         let (tx, mut rx) = channel(self.max_task);
-        let fetcher = Arc::new(self.task_fetcher);
         let count = Arc::new(AtomicUsize::new(0));
 
         {
             let worker_id = self.worker_id.clone();
-            let fetcher = fetcher.clone();
+            let fetcher = self.task_fetcher.clone();
             let count_clone = count.clone();
             tokio::spawn(async move {
                 info!("start task fetcher, wait for new task todo");
@@ -115,7 +168,7 @@ impl Worker for LocalWorker {
 
         {
             let worker_id = self.worker_id.clone();
-            let fetcher = fetcher.clone();
+            let fetcher = self.task_fetcher.clone();
             let (result_tx, mut result_rx) = channel(1);
             tokio::spawn(async move {
                 info!(
@@ -165,7 +218,7 @@ impl Worker for LocalWorker {
                                     match exec_result {
                                         Ok(proof_arg) => {
                                             info!("worker {} completed {} success", worker_id.clone(), undo_task.id);
-                                            if let Some(e) = fetcher.record_proof(worker_id.clone(), undo_task.id.clone(), proof_arg.proof).await{
+                                            if let Err(e) = fetcher.record_proof(worker_id.clone(), undo_task.id.clone(), proof_arg.proof).await{
                                                 error!("record proof for task {} error reason {}", undo_task.id.clone(), e.to_string())
                                             }
                                         }
@@ -176,7 +229,7 @@ impl Worker for LocalWorker {
                                                 undo_task.id,
                                                 e.to_string()
                                             );
-                                           if let Some(e) = fetcher.record_error(worker_id.clone(), undo_task.id.clone(), e.to_string()).await{
+                                           if let Err(e) = fetcher.record_error(worker_id.clone(), undo_task.id.clone(), e.to_string()).await{
                                                error!("record error for task {} error reason {}", undo_task.id.clone(), e.to_string())
                                            }
                                         }
@@ -192,7 +245,7 @@ impl Worker for LocalWorker {
     }
 }
 
-async fn c2(resource: Vec<u8>) -> anyhow::Result<SealCommitPhase2Output> {
+async fn c2(resource: Vec<u8>) -> Result<SealCommitPhase2Output> {
     let join_result = tokio::task::spawn_blocking(move || {
         let c2_resource: C2Resource =
             serde_json::from_slice(&resource).context("deserialize c2 resource")?;

@@ -9,6 +9,7 @@ use gpuproxy::config::*;
 use gpuproxy::proxy_rpc::rpc::{ProxyImpl, ONE_GIB};
 use gpuproxy::proxy_rpc::*;
 use gpuproxy::resource;
+use gpuproxy::utils::ensure_db_file;
 use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle, RpcModule};
 use log::*;
 use migration::Migrator;
@@ -21,11 +22,13 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::signal::ctrl_c;
 use tokio::signal::unix::{signal, SignalKind};
+
 #[tokio::main()]
 async fn main() {
     let worker_args = cli::get_worker_arg();
-    let list_task_cmds = cli::list_task_cmds().await;
+    let task_cmds = cli::task_cmds().await;
     let fetch_params_cmds = cli::fetch_params_cmds().await;
+    let worker_cmds = cli::worker_cmds().await;
     let app_m = Command::new("gpuproxy")
         .version("0.0.1")
         .args(&[
@@ -91,13 +94,15 @@ async fn main() {
                 ])
                 .args(worker_args),
         )
-        .subcommand(list_task_cmds)
+        .subcommand(task_cmds)
         .subcommand(fetch_params_cmds)
+        .subcommand(worker_cmds)
         .get_matches();
 
     let exec_result: Result<()> = match app_m.subcommand() {
         Some(("run", ref sub_m)) => start_server(sub_m).await,
-        Some(("tasks", ref sub_m)) => cli::tasks_command(sub_m).await, // task was used
+        Some(("task", ref sub_m)) => cli::tasks_command(sub_m).await, // task was used
+        Some(("worker", ref sub_m)) => cli::worker_command(sub_m).await, // task was used
         Some(("paramfetch", ref sub_m)) => cli::fetch_params_command(sub_m).await, // run was used
         _ => Ok(()), // Either no subcommand or one not tested for...
     };
@@ -171,6 +176,7 @@ async fn start_server(sub_m: &&ArgMatches) -> Result<()> {
         ColorChoice::Auto,
     )?;
 
+    ensure_db_file(&cfg.db_dsn).await?;
     let mut opt = ConnectOptions::new(cfg.db_dsn);
     opt.max_connections(10)
         .min_connections(5)
@@ -200,6 +206,7 @@ async fn start_server(sub_m: &&ArgMatches) -> Result<()> {
 
     let rpc_module = rpc::register(resource, arc_pool);
     if !cfg.disable_worker {
+        worker.register(Some("127.0.0.1".to_owned())).await?;
         worker.process_tasks().await;
         info!("ready for local worker address worker_id {}", worker_id);
     }
@@ -223,7 +230,7 @@ async fn start_server(sub_m: &&ArgMatches) -> Result<()> {
 async fn start_api(
     url: &str,
     module: RpcModule<ProxyImpl>,
-) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
+) -> Result<(SocketAddr, HttpServerHandle)> {
     let server = HttpServerBuilder::default()
         .max_request_body_size(ONE_GIB)
         .build(url.parse::<SocketAddr>()?)?;

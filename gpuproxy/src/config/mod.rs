@@ -66,6 +66,7 @@ pub struct WorkerConfig {
     pub log_level: String,
     pub resource: Resource,
     pub debug_sql: bool,
+    pub manual_ip: Option<String>,
 }
 
 impl WorkerConfig {
@@ -79,6 +80,7 @@ impl WorkerConfig {
         log_level: String,
         allow_types: Option<Vec<TaskType>>,
         debug_sql: bool,
+        manual_ip: Option<String>,
     ) -> Self {
         let resource = if resource_type == "db" {
             Resource::Db
@@ -93,6 +95,7 @@ impl WorkerConfig {
             log_level,
             allow_types,
             debug_sql,
+            manual_ip,
         }
     }
 }

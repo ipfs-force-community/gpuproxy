@@ -1,5 +1,4 @@
-use anyhow::anyhow;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::value_parser;
 use std::borrow::{Borrow, BorrowMut};
 use std::convert::TryFrom;
@@ -7,6 +6,7 @@ use std::fmt::format;
 use std::process::exit;
 use std::rc::Rc;
 
+use crate::cli::utils::timestamp_to_string;
 use crate::proxy_rpc::rpc::{get_proxy_api, GpuServiceRpcClient};
 use chrono::{DateTime, Local, LocalResult, NaiveDateTime, TimeZone, Utc};
 use clap::{Arg, ArgAction, ArgMatches, Command};
@@ -14,10 +14,10 @@ use entity::tasks::Model as Task;
 use entity::{TaskState, TaskType};
 use tabled::{builder::Builder, Style};
 
-pub async fn list_task_cmds<'a>() -> Command<'a> {
-    Command::new("tasks")
+pub async fn task_cmds<'a>() -> Command<'a> {
+    Command::new("task")
         .arg_required_else_help(true)
-        .about("run daemon for provide service")
+        .about("task command")
         .subcommand(
             Command::new("list")
                 .about("list task status")
@@ -46,20 +46,46 @@ pub async fn list_task_cmds<'a>() -> Command<'a> {
                         .help("id slice of id"),
                 ]),
         )
+        .subcommand(
+            Command::new("get")
+                .about("get task detail")
+                .args(&[Arg::new("id")
+                    .last(true)
+                    .takes_value(true)
+                    .required(true)
+                    .help("task id")]),
+        )
 }
 
 pub async fn tasks_command(task_m: &&ArgMatches) -> Result<()> {
     match task_m.subcommand() {
-        Some(("list", ref sub_m)) => list_tasks(sub_m).await, // run was used
-        Some(("update-state", ref sub_m)) => update_status_by_id(sub_m).await, // run was used
+        Some(("list", ref sub_m)) => list_tasks(sub_m).await,
+        Some(("update-state", ref sub_m)) => update_status_by_id(sub_m).await,
+        Some(("get", ref sub_m)) => get_task(sub_m).await,
         _ => Err(anyhow!("command not found")),
     }
+}
+
+pub async fn get_task(sub_m: &&ArgMatches) -> Result<()> {
+    let url: String = sub_m
+        .get_one::<String>("url")
+        .ok_or_else(|| anyhow!("url flag not found"))?
+        .clone();
+
+    let id: String = sub_m
+        .get_one::<String>("id")
+        .ok_or_else(|| anyhow!("id argument not found"))?
+        .clone();
+
+    let server_api = get_proxy_api(url).await?;
+    let task = server_api.get_task(id).await?;
+    print_one_task(task)
 }
 
 pub async fn list_tasks(sub_m: &&ArgMatches) -> Result<()> {
     let url: String = sub_m
         .get_one::<String>("url")
-        .ok_or_else(|| anyhow!("url falg not found"))?
+        .ok_or_else(|| anyhow!("url flag not found"))?
         .clone();
 
     let states = if sub_m.contains_id("state") {
@@ -74,8 +100,8 @@ pub async fn list_tasks(sub_m: &&ArgMatches) -> Result<()> {
     } else {
         None
     };
-    let worker_api = get_proxy_api(url).await?;
-    let tasks = worker_api.list_task(None, states).await?;
+    let server_api = get_proxy_api(url).await?;
+    let tasks = server_api.list_task(None, states).await?;
     print_task(tasks)
 }
 
@@ -97,10 +123,9 @@ pub async fn update_status_by_id(sub_m: &&ArgMatches) -> Result<()> {
         .ok_or_else(|| anyhow!("state flag not found"))?
         .try_into()?;
 
-    let worker_api = get_proxy_api(url).await?;
-    if worker_api.update_status_by_id(ids, state).await? {
-        println!("update state success");
-    }
+    let server_api = get_proxy_api(url).await?;
+    server_api.update_status_by_id(ids, state).await?;
+    println!("update state success");
     Ok(())
 }
 
@@ -118,16 +143,24 @@ fn print_task(tasks: Vec<Task>) -> Result<()> {
     ]);
 
     for task in tasks {
+        let new_err_msg = if task.error_msg.len() > 20 {
+            let mut pre_err_msg = task.error_msg[..20].to_string();
+            pre_err_msg.push_str("...");
+            pre_err_msg
+        } else {
+            task.error_msg
+        };
+
         builder = builder.add_row([
             task.id.as_str(),
             task.miner.as_str(),
             task.task_type.to_string().as_str(),
             state_to_string(task.state).as_str(),
             task.resource_id.as_str(),
-            task.error_msg.as_str(),
-            unit_time(task.create_at).as_str(),
-            unit_time(task.start_at).as_str(),
-            unit_time(task.complete_at).as_str(),
+            new_err_msg.as_str(),
+            timestamp_to_string(task.create_at).as_str(),
+            timestamp_to_string(task.start_at).as_str(),
+            timestamp_to_string(task.complete_at).as_str(),
         ]);
     }
 
@@ -136,12 +169,23 @@ fn print_task(tasks: Vec<Task>) -> Result<()> {
     Ok(())
 }
 
-fn unit_time(tm: i64) -> String {
-    match Local.timestamp_opt(tm, 0) {
-        LocalResult::None => "".to_string(),
-        LocalResult::Single(v) => v.to_string(),
-        LocalResult::Ambiguous(v1, v2) => format!("{}, {}", v1, v2),
-    }
+fn print_one_task(task: Task) -> Result<()> {
+    let table = Builder::default()
+        .set_header(["Name", "Value"])
+        .add_row(["Id", task.id.as_str()])
+        .add_row(["Miner", task.miner.as_str()])
+        .add_row(["Miner", task.miner.as_str()])
+        .add_row(["Type", task.task_type.to_string().as_str()])
+        .add_row(["State", state_to_string(task.state).as_str()])
+        .add_row(["ResourceId", task.resource_id.as_str()])
+        .add_row(["Err", task.error_msg.as_str()])
+        .add_row(["CreateAt", timestamp_to_string(task.create_at).as_str()])
+        .add_row(["StartAt", timestamp_to_string(task.start_at).as_str()])
+        .add_row(["CompleteAt", timestamp_to_string(task.complete_at).as_str()])
+        .build()
+        .with(Style::ascii());
+    println!("{}", table);
+    Ok(())
 }
 
 fn state_to_string(state: TaskState) -> String {

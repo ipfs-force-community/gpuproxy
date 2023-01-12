@@ -5,11 +5,18 @@ use std::str::FromStr;
 use crate::utils::Base64Byte;
 use crate::utils::{IntoAnyhow, IntoJsonRpcResult, ReveseOption};
 use crate::{resource, utils};
-use anyhow::anyhow;
-use entity::tasks as Tasks;
-use entity::worker_info as WorkerInfos;
+use anyhow::{anyhow, Result};
 use entity::TaskType;
+
+use entity::tasks as Tasks;
+use Tasks::Model as Task;
+
+use entity::worker_info as WorkerInfos;
+use WorkerInfos::Model as WorkerInfo;
+
+use entity::workers_state::Model as WorkerState;
 use entity::{resource_info as ResourceInfos, TaskState};
+
 use hyper::Uri;
 use jsonrpsee::core::{async_trait, client::Subscription, RpcResult};
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
@@ -19,8 +26,6 @@ use jsonrpsee::RpcModule;
 use std::sync::Arc;
 use uuid::Uuid;
 use ResourceInfos::Model as ResourceInfo;
-use Tasks::Model as Task;
-use WorkerInfos::Model as WorkerInfo;
 
 pub const ONE_GIB: u32 = 1024 * 1024 * 1024;
 
@@ -65,7 +70,7 @@ pub trait ProxyRpc {
         worker_id_arg: String,
         tid: String,
         proof: Base64Byte,
-    ) -> RpcResult<bool>;
+    ) -> RpcResult<()>;
 
     #[method(name = "Proof.RecordError")]
     async fn record_error(
@@ -73,7 +78,7 @@ pub trait ProxyRpc {
         worker_id_arg: String,
         tid: String,
         err_msg: String,
-    ) -> RpcResult<bool>;
+    ) -> RpcResult<()>;
 
     #[method(name = "Proof.ListTask")]
     async fn list_task(
@@ -87,7 +92,33 @@ pub trait ProxyRpc {
         &self,
         tids: Vec<String>,
         status: entity::TaskState,
-    ) -> RpcResult<bool>;
+    ) -> RpcResult<()>;
+
+    #[method(name = "Proof.ReportWorkerInfo")]
+    async fn report_worker_info(
+        &self,
+        worker_id_arg: String,
+        ips: String,
+        support_types: String,
+    ) -> RpcResult<()>;
+
+    #[method(name = "Proof.ListWorker")]
+    async fn list_worker(&self) -> RpcResult<Vec<WorkerState>>;
+
+    #[method(name = "Proof.DeleteWorkerByWorkerId")]
+    async fn delete_worker_by_worker_id(&self, worker_id_arg: String) -> RpcResult<()>;
+
+    #[method(name = "Proof.DeleteWorkerById")]
+    async fn delete_worker_by_id(&self, id: String) -> RpcResult<()>;
+
+    #[method(name = "Proof.GetWorkerByWorkerId")]
+    async fn get_worker_by_worker_id(&self, worker_id_arg: String) -> RpcResult<WorkerState>;
+
+    #[method(name = "Proof.GetWorkerById")]
+    async fn get_worker_by_id(&self, id: String) -> RpcResult<WorkerState>;
+
+    #[method(name = "Proof.GetOfflineWorker")]
+    async fn get_offline_worker(&self, dur: i64) -> RpcResult<Vec<WorkerState>>;
 }
 
 pub struct ProxyImpl {
@@ -205,11 +236,11 @@ impl ProxyRpcServer for ProxyImpl {
         worker_id_arg: String,
         tid: String,
         proof: Base64Byte,
-    ) -> RpcResult<bool> {
+    ) -> RpcResult<()> {
         self.pool
             .record_proof(worker_id_arg, tid, proof.0)
             .await
-            .reverse_map_err()
+            .internal_call_error()
     }
 
     /// Record task error while completing
@@ -218,11 +249,11 @@ impl ProxyRpcServer for ProxyImpl {
         worker_id_arg: String,
         tid: String,
         err_msg: String,
-    ) -> RpcResult<bool> {
+    ) -> RpcResult<()> {
         self.pool
             .record_error(worker_id_arg, tid, err_msg)
             .await
-            .reverse_map_err()
+            .internal_call_error()
     }
 
     /// List task by worker id and task state
@@ -242,11 +273,59 @@ impl ProxyRpcServer for ProxyImpl {
         &self,
         tids: Vec<String>,
         state: entity::TaskState,
-    ) -> RpcResult<bool> {
+    ) -> RpcResult<()> {
         self.pool
             .update_status_by_id(tids, state)
             .await
-            .reverse_map_err()
+            .internal_call_error()
+    }
+
+    async fn report_worker_info(
+        &self,
+        worker_id_arg: String,
+        ips: String,
+        support_types: String,
+    ) -> RpcResult<()> {
+        self.pool
+            .report_worker_info(worker_id_arg, ips, support_types)
+            .await
+            .internal_call_error()
+    }
+
+    async fn list_worker(&self) -> RpcResult<Vec<WorkerState>> {
+        self.pool.list_worker().await.internal_call_error()
+    }
+
+    async fn delete_worker_by_worker_id(&self, worker_id_arg: String) -> RpcResult<()> {
+        self.pool
+            .delete_worker_by_worker_id(worker_id_arg)
+            .await
+            .internal_call_error()
+    }
+
+    async fn delete_worker_by_id(&self, id: String) -> RpcResult<()> {
+        self.pool
+            .delete_worker_by_id(id)
+            .await
+            .internal_call_error()
+    }
+
+    async fn get_worker_by_worker_id(&self, worker_id_arg: String) -> RpcResult<WorkerState> {
+        self.pool
+            .get_worker_by_worker_id(worker_id_arg)
+            .await
+            .internal_call_error()
+    }
+
+    async fn get_worker_by_id(&self, id: String) -> RpcResult<WorkerState> {
+        self.pool.get_worker_by_id(id).await.internal_call_error()
+    }
+
+    async fn get_offline_worker(&self, dur: i64) -> RpcResult<Vec<WorkerState>> {
+        self.pool
+            .get_offline_worker(dur)
+            .await
+            .internal_call_error()
     }
 }
 
@@ -260,7 +339,7 @@ pub fn register(
 }
 
 /// get proxy api by url
-pub async fn get_proxy_api(url: String) -> anyhow::Result<WrapClient> {
+pub async fn get_proxy_api(url: String) -> Result<WrapClient> {
     let uri = Uri::from_str(&url)?;
     let new_url = if uri.scheme().is_none() {
         "http://".to_owned() + &url
@@ -282,18 +361,18 @@ pub struct WrapClient {
 
 #[async_trait]
 impl resource::Resource for WrapClient {
-    async fn has_resource(&self, resource_id: String) -> anyhow::Result<bool> {
+    async fn has_resource(&self, resource_id: String) -> Result<bool> {
         Err(anyhow!("not support set resource in worker"))
     }
 
-    async fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Base64Byte> {
+    async fn get_resource_info(&self, resource_id_arg: String) -> Result<Base64Byte> {
         self.client
             .get_resource_info(resource_id_arg)
             .await
             .anyhow()
     }
 
-    async fn store_resource_info(&self, _: String, _: Vec<u8>) -> anyhow::Result<String> {
+    async fn store_resource_info(&self, _: String, _: Vec<u8>) -> Result<String> {
         Err(anyhow!("not support set resource in worker"))
     }
 }
@@ -304,38 +383,38 @@ impl WorkerFetch for WrapClient {
         &self,
         worker_id: String,
         types: Option<Vec<entity::TaskType>>,
-    ) -> anyhow::Result<Task> {
+    ) -> Result<Task> {
         self.client.fetch_todo(worker_id, types).await.anyhow()
     }
 
-    async fn fetch_uncompleted(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>> {
+    async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>> {
         self.client.fetch_uncompleted(worker_id_arg).await.anyhow()
     }
 
-    async fn record_error(
-        &self,
-        worker_id: String,
-        tid: String,
-        err_msg: String,
-    ) -> Option<anyhow::Error> {
+    async fn record_error(&self, worker_id: String, tid: String, err_msg: String) -> Result<()> {
         self.client
             .record_error(worker_id, tid, err_msg)
             .await
-            .err()
-            .map(|e| anyhow!(e.to_string()))
+            .anyhow()
     }
 
-    async fn record_proof(
-        &self,
-        worker_id: String,
-        tid: String,
-        proof: Vec<u8>,
-    ) -> Option<anyhow::Error> {
+    async fn record_proof(&self, worker_id: String, tid: String, proof: Vec<u8>) -> Result<()> {
         self.client
             .record_proof(worker_id, tid, Base64Byte(proof))
             .await
-            .err()
-            .map(|e| anyhow!(e.to_string()))
+            .anyhow()
+    }
+
+    async fn report_worker_info(
+        &self,
+        worker_id_arg: String,
+        ips: String,
+        support_types: String,
+    ) -> Result<()> {
+        self.client
+            .report_worker_info(worker_id_arg, ips, support_types)
+            .await
+            .anyhow()
     }
 }
 
@@ -347,52 +426,63 @@ pub trait GpuServiceRpcClient {
         miner: String,
         prover_id: ProverId,
         sector_id: u64,
-    ) -> anyhow::Result<String>;
+    ) -> Result<String>;
 
     async fn add_task(
         &self,
         miner: String,
         task_type: TaskType,
         param: Base64Byte,
-    ) -> anyhow::Result<String>;
+    ) -> Result<String>;
 
-    async fn get_task(&self, id: String) -> anyhow::Result<Task>;
+    async fn get_task(&self, id: String) -> Result<Task>;
 
     async fn fetch_todo(
         &self,
         worker_id_arg: String,
         types: Option<Vec<entity::TaskType>>,
-    ) -> anyhow::Result<Task>;
+    ) -> Result<Task>;
 
-    async fn fetch_uncompleted(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>>;
+    async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>>;
 
-    async fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Base64Byte>;
+    async fn get_resource_info(&self, resource_id_arg: String) -> Result<Base64Byte>;
 
     async fn record_proof(
         &self,
         worker_id_arg: String,
         tid: String,
         proof: Base64Byte,
-    ) -> anyhow::Result<bool>;
+    ) -> Result<()>;
 
-    async fn record_error(
-        &self,
-        worker_id_arg: String,
-        tid: String,
-        err_msg: String,
-    ) -> anyhow::Result<bool>;
+    async fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String)
+        -> Result<()>;
 
     async fn list_task(
         &self,
         worker_id_arg: Option<String>,
         state: Option<Vec<entity::TaskState>>,
-    ) -> anyhow::Result<Vec<Task>>;
+    ) -> Result<Vec<Task>>;
 
-    async fn update_status_by_id(
+    async fn update_status_by_id(&self, tids: Vec<String>, state: entity::TaskState) -> Result<()>;
+
+    async fn report_worker_info(
         &self,
-        tids: Vec<String>,
-        state: entity::TaskState,
-    ) -> anyhow::Result<bool>;
+        worker_id_arg: String,
+        ips: String,
+        support_types: String,
+    ) -> Result<()>;
+
+    async fn list_worker(&self) -> Result<Vec<WorkerState>>;
+
+    async fn delete_worker_by_worker_id(&self, worker_id_arg: String) -> Result<()>;
+
+    async fn delete_worker_by_id(&self, id: String) -> Result<()>;
+
+    async fn get_worker_by_worker_id(&self, worker_id_arg: String) -> Result<WorkerState>;
+
+    async fn get_worker_by_id(&self, id: String) -> Result<WorkerState>;
+
+    async fn get_offline_worker(&self, dur: i64) -> Result<Vec<WorkerState>>;
 }
 
 #[async_trait]
@@ -403,7 +493,7 @@ impl GpuServiceRpcClient for WrapClient {
         miner: String,
         prover_id: ProverId,
         sector_id: u64,
-    ) -> anyhow::Result<String> {
+    ) -> Result<String> {
         self.client
             .submit_c2_task(phase1_output, miner, prover_id, sector_id)
             .await
@@ -415,11 +505,11 @@ impl GpuServiceRpcClient for WrapClient {
         miner: String,
         task_type: TaskType,
         param: Base64Byte,
-    ) -> anyhow::Result<String> {
+    ) -> Result<String> {
         self.client.add_task(miner, task_type, param).await.anyhow()
     }
 
-    async fn get_task(&self, id: String) -> anyhow::Result<Task> {
+    async fn get_task(&self, id: String) -> Result<Task> {
         self.client.get_task(id).await.anyhow()
     }
 
@@ -427,15 +517,15 @@ impl GpuServiceRpcClient for WrapClient {
         &self,
         worker_id_arg: String,
         types: Option<Vec<entity::TaskType>>,
-    ) -> anyhow::Result<Task> {
+    ) -> Result<Task> {
         self.client.fetch_todo(worker_id_arg, types).await.anyhow()
     }
 
-    async fn fetch_uncompleted(&self, worker_id_arg: String) -> anyhow::Result<Vec<Task>> {
+    async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>> {
         self.client.fetch_uncompleted(worker_id_arg).await.anyhow()
     }
 
-    async fn get_resource_info(&self, resource_id_arg: String) -> anyhow::Result<Base64Byte> {
+    async fn get_resource_info(&self, resource_id_arg: String) -> Result<Base64Byte> {
         self.client
             .get_resource_info(resource_id_arg)
             .await
@@ -447,7 +537,7 @@ impl GpuServiceRpcClient for WrapClient {
         worker_id_arg: String,
         tid: String,
         proof: Base64Byte,
-    ) -> anyhow::Result<bool> {
+    ) -> Result<()> {
         self.client
             .record_proof(worker_id_arg, tid, proof)
             .await
@@ -459,7 +549,7 @@ impl GpuServiceRpcClient for WrapClient {
         worker_id_arg: String,
         tid: String,
         err_msg: String,
-    ) -> anyhow::Result<bool> {
+    ) -> Result<()> {
         self.client
             .record_error(worker_id_arg, tid, err_msg)
             .await
@@ -470,15 +560,53 @@ impl GpuServiceRpcClient for WrapClient {
         &self,
         worker_id_arg: Option<String>,
         state: Option<Vec<entity::TaskState>>,
-    ) -> anyhow::Result<Vec<Task>> {
+    ) -> Result<Vec<Task>> {
         self.client.list_task(worker_id_arg, state).await.anyhow()
     }
 
-    async fn update_status_by_id(
-        &self,
-        tids: Vec<String>,
-        state: entity::TaskState,
-    ) -> anyhow::Result<bool> {
+    async fn update_status_by_id(&self, tids: Vec<String>, state: entity::TaskState) -> Result<()> {
         self.client.update_status_by_id(tids, state).await.anyhow()
+    }
+
+    async fn report_worker_info(
+        &self,
+        worker_id_arg: String,
+        ips: String,
+        support_types: String,
+    ) -> Result<()> {
+        self.client
+            .report_worker_info(worker_id_arg, ips, support_types)
+            .await
+            .anyhow()
+    }
+
+    async fn list_worker(&self) -> Result<Vec<WorkerState>> {
+        self.client.list_worker().await.anyhow()
+    }
+
+    async fn delete_worker_by_worker_id(&self, worker_id_arg: String) -> Result<()> {
+        self.client
+            .delete_worker_by_worker_id(worker_id_arg)
+            .await
+            .anyhow()
+    }
+
+    async fn delete_worker_by_id(&self, id: String) -> Result<()> {
+        self.client.delete_worker_by_id(id).await.anyhow()
+    }
+
+    async fn get_worker_by_worker_id(&self, worker_id_arg: String) -> Result<WorkerState> {
+        self.client
+            .get_worker_by_worker_id(worker_id_arg)
+            .await
+            .anyhow()
+    }
+
+    async fn get_worker_by_id(&self, id: String) -> Result<WorkerState> {
+        self.client.get_worker_by_id(id).await.anyhow()
+    }
+
+    async fn get_offline_worker(&self, dur: i64) -> Result<Vec<WorkerState>> {
+        self.client.get_offline_worker(dur).await.anyhow()
     }
 }
