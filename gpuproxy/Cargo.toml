@@ -45,7 +45,7 @@ base64 = "0.13.0"
 bytes = "1.1.0"
 uuid = { version = "0.8", features = ["v4", "v5"] }
 scopeguard = "1.1.0"
-tokio = { version = "1.23.0", features = ["full"] }
+tokio = { version = "1.23.1", features = ["full"] }
 tabled = { version = "*", features = ["color"] }
 tracing = "0.1"
 local-ip-address = "0.5.1"
