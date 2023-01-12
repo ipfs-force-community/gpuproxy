@@ -96,14 +96,14 @@ impl Worker for LocalWorker {
         tokio::spawn(async move {
             let mut interval = time::interval(Duration::from_secs(60));
             loop {
+                interval.tick().await;
+
                 if let Err(err) = fetcher
                     .report_worker_info(worker_id.clone(), ips.clone(), support_types.clone())
                     .await
                 {
                     error!("unable to report worker status {}", err)
                 }
-
-                interval.tick().await;
             }
         });
         Ok(())
