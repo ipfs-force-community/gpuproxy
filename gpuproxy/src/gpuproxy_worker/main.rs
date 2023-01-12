@@ -9,6 +9,7 @@ use gpuproxy::cli;
 use gpuproxy::config::*;
 use gpuproxy::proxy_rpc::*;
 use gpuproxy::resource;
+use gpuproxy::utils::ensure_db_file;
 use log::*;
 use migration::Migrator;
 use sea_orm::{ConnectOptions, Database};
@@ -74,6 +75,12 @@ async fn main() {
                         .required(false)
                         .action(ArgAction::SetTrue)
                         .help("print sql to debug"),
+                    Arg::new("manual-ip")
+                        .long("manual-ip")
+                        .env("C2PROXY_MANUAL_IP")
+                        .required(false)
+                        .takes_value(true)
+                        .help("set ip manually"),
                 ])
                 .args(worker_args),
         )
@@ -116,6 +123,7 @@ async fn run_worker(sub_m: &&ArgMatches) -> Result<()> {
         .get_one::<String>("fs-resource-path")
         .ok_or_else(|| anyhow!("fs-resource-path flag not found"))?
         .clone();
+    let manual_ip = sub_m.get_one::<String>("manual-ip");
     let allow_types = if sub_m.contains_id("allow-type") {
         let values = sub_m
             .get_many::<i32>("allow-type")
@@ -137,6 +145,7 @@ async fn run_worker(sub_m: &&ArgMatches) -> Result<()> {
         log_level,
         allow_types,
         debug_sql,
+        manual_ip.cloned(),
     );
 
     let lv = LevelFilter::from_str(cfg.log_level.as_str())?;
@@ -147,6 +156,7 @@ async fn run_worker(sub_m: &&ArgMatches) -> Result<()> {
         ColorChoice::Auto,
     )?;
 
+    ensure_db_file(&cfg.db_dsn).await?;
     let mut opt = ConnectOptions::new(cfg.db_dsn);
     opt.max_connections(10)
         .min_connections(5)
@@ -170,6 +180,7 @@ async fn run_worker(sub_m: &&ArgMatches) -> Result<()> {
         resource,
         worker_api,
     );
+    worker.register(cfg.manual_ip.clone()).await?;
     worker.process_tasks().await;
     info!("ready for local worker address worker_id {}", worker_id);
     let mut sig_int = signal(SignalKind::interrupt())?;

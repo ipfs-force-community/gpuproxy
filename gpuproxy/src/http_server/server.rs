@@ -89,21 +89,20 @@ impl<M> Builder<M> {
     /// ```
     /// use std::time::Instant;
     ///
-    /// use jsonrpsee_core::middleware::Middleware;
-    /// use jsonrpsee_http_server::HttpServerBuilder;
+    /// use gpuproxy::http_server::middleware::Middleware;
+    /// use gpuproxy::http_server::HttpServerBuilder;
     ///
     /// #[derive(Clone)]
     /// struct MyMiddleware;
     ///
     /// impl Middleware for MyMiddleware {
-    ///     type Instant = Instant;
     ///
-    ///     fn on_request(&self) -> Instant {
-    ///         Instant::now()
+    ///     fn on_request(&self) -> bool {
+    ///        true
     ///     }
     ///
-    ///     fn on_result(&self, name: &str, success: bool, started_at: Instant) {
-    ///         println!("Call to '{}' took {:?}", name, started_at.elapsed());
+    ///     fn on_result(&self) {
+    ///        println!("do nothing")
     ///     }
     /// }
     ///
@@ -168,8 +167,8 @@ impl<M> Builder<M> {
     ///       occupied_addr,
     ///       "127.0.0.1:0".parse().unwrap(),
     ///   ];
-    ///   assert!(jsonrpsee_http_server::HttpServerBuilder::default().build(occupied_addr).is_err());
-    ///   assert!(jsonrpsee_http_server::HttpServerBuilder::default().build(addrs).is_ok());
+    ///   assert!(jsonrpsee::http_server::HttpServerBuilder::default().build(occupied_addr).is_err());
+    ///   assert!(jsonrpsee::http_server::HttpServerBuilder::default().build(addrs).is_ok());
     /// }
     /// ```
     pub fn build(self, addrs: impl ToSocketAddrs) -> Result<Server<M>, Error> {
