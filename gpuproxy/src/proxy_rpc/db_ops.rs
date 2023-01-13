@@ -40,7 +40,6 @@ pub trait ResourceRepo {
     async fn store_resource_info(&self, resource_id: String, resource: Vec<u8>) -> Result<String>;
 }
 
-
 #[async_trait]
 pub trait TaskRepo {
     async fn add_task(
@@ -67,7 +66,7 @@ pub trait TaskRepo {
     ) -> Result<Task>;
     async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>>;
     async fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String)
-                          -> Result<()>;
+        -> Result<()>;
     async fn record_proof(&self, worker_id_arg: String, tid: String, proof: Vec<u8>) -> Result<()>;
 }
 
@@ -88,8 +87,8 @@ pub trait WorkerStateRepo {
     async fn get_offline_worker(&self, dur: i64) -> Result<Vec<WorkerState>>;
 }
 
-pub trait Repo: ResourceRepo + WorkerRepo + TaskRepo + WorkerStateRepo{}
-impl<T> Repo for T where T:ResourceRepo +  WorkerRepo + TaskRepo + WorkerStateRepo{}
+pub trait Repo: ResourceRepo + WorkerRepo + TaskRepo + WorkerStateRepo {}
+impl<T> Repo for T where T: ResourceRepo + WorkerRepo + TaskRepo + WorkerStateRepo {}
 
 pub struct DbOpsImpl {
     conn: DatabaseConnection,
