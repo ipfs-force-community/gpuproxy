@@ -1,4 +1,5 @@
 use crate::proxy_rpc::db_ops::*;
+use crate::proxy_rpc::rpc::GpuServiceRpcClient;
 use crate::resource::{C2Resource, ResourceOp};
 use crate::utils::*;
 use anyhow::{anyhow, Context, Result};
@@ -20,7 +21,6 @@ use tokio::time::{sleep, Duration};
 use ResourceInfos::Model as ResourceInfo;
 use Tasks::Model as Task;
 use WorkerInfos::Model as WorkerInfo;
-use crate::proxy_rpc::rpc::GpuServiceRpcClient;
 
 /// GPU worker used to execute specify task
 #[async_trait]

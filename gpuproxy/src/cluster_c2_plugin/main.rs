@@ -151,12 +151,13 @@ async fn process_request(
     req: Request<C2Input>,
 ) -> Result<SealCommitPhase2Output> {
     let sector_id = req.task.sector_id;
+    let miner_id = req.task.miner_id;
     let input = req.task;
 
     trace!("input: {:?}", input);
 
     let params_bytes = serde_json::to_vec(&input).context("unmarshal c2 input")?;
-    let miner_addr = forest_address::Address::new_id(input.miner_id);
+    let miner_addr = forest_address::Address::new_id(miner_id);
 
     let proxy_client = get_proxy_api(cfg.url.clone())
         .await
@@ -173,14 +174,14 @@ async fn process_request(
                     .await?;
                 info!(
                     "reset failed task miner_id {} task_id {}, sector_id {}",
-                    input.miner_id,
+                    miner_id,
                     task_id.clone(),
                     sector_id.clone()
                 );
             } else {
                 info!(
                     "trace exit task miner_id {} task_id {}, sector_id {}",
-                    input.miner_id,
+                    miner_id,
                     task_id.clone(),
                     sector_id.clone()
                 );
@@ -193,6 +194,7 @@ async fn process_request(
                 proxy_client
                     .add_task(
                         miner_addr.to_string(),
+                        format!("{} MinerId({})", sector_id.clone(), miner_id),
                         TaskType::C2,
                         Base64Byte(params_bytes),
                     )
@@ -200,7 +202,7 @@ async fn process_request(
                     .context("add task")?;
                 info!(
                     "create new task miner_id {}  task_id {} sector_id {} successfully",
-                    input.miner_id,
+                    miner_id,
                     task_id.clone(),
                     sector_id
                 );
@@ -265,16 +267,17 @@ impl PluginOut {
             err_msg: None,
             output: Some(val),
         })
-            .await
+        .await
     }
 
     async fn write_err<E: fmt::Display>(&self, id: u64, err: E) -> Result<()> {
-        self.write_resp(Response::<()> {      //type just mock
+        self.write_resp(Response::<()> {
+            //type just mock
             id,
             err_msg: Some(format!("{:?}", err.to_string())),
             output: None,
         })
-            .await
+        .await
     }
 
     async fn write_resp<T: serde::Serialize>(&self, resp: Response<T>) -> Result<()> {

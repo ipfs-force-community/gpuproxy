@@ -23,10 +23,10 @@ use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use jsonrpsee::proc_macros::rpc;
 use jsonrpsee::types::error::ErrorCode::{InternalError, InvalidParams};
 use jsonrpsee::RpcModule;
+use resource::ResourceOp;
 use std::sync::Arc;
 use uuid::Uuid;
 use ResourceInfos::Model as ResourceInfo;
-use resource::ResourceOp;
 
 pub const ONE_GIB: u32 = 1024 * 1024 * 1024;
 
@@ -37,6 +37,7 @@ pub trait ProxyRpc {
         &self,
         phase1_output: Base64Byte,
         miner: String,
+        comment: String,
         prover_id: ProverId,
         sector_id: u64,
     ) -> RpcResult<String>;
@@ -45,6 +46,7 @@ pub trait ProxyRpc {
     async fn add_task(
         &self,
         miner: String,
+        comment: String,
         task_type: entity::TaskType,
         param: Base64Byte,
     ) -> RpcResult<String>;
@@ -100,11 +102,8 @@ pub trait ProxyRpc {
         support_types: String,
     ) -> RpcResult<()>;
 
-
-
     #[method(name = "Proof.GetResourceInfo")]
     async fn get_resource_info(&self, resource_id_arg: String) -> RpcResult<Base64Byte>;
-
 
     #[method(name = "Proof.ListWorker")]
     async fn list_worker(&self) -> RpcResult<Vec<WorkerState>>;
@@ -134,6 +133,7 @@ impl ProxyImpl {
     async fn add_task_inner(
         &self,
         addr: forest_address::Address,
+        comment: String,
         task_type: TaskType,
         resource_bytes: Vec<u8>,
     ) -> RpcResult<String> {
@@ -150,7 +150,7 @@ impl ProxyImpl {
         if !self.pool.has_task(task_id.clone()).await? {
             self.pool
                 .clone()
-                .add_task(task_id.clone(), addr, task_type, resource_id)
+                .add_task(task_id.clone(), addr, task_type, resource_id, comment)
                 .await
                 .internal_call_error()?;
         }
@@ -165,6 +165,7 @@ impl ProxyRpcServer for ProxyImpl {
         &self,
         phase1_output: Base64Byte,
         miner: String,
+        comment: String,
         prover_id: ProverId,
         sector_id: u64,
     ) -> RpcResult<String> {
@@ -179,7 +180,7 @@ impl ProxyRpcServer for ProxyImpl {
 
         let resource_bytes = serde_json::to_vec(&c2_resource).invalid_params()?;
 
-        self.add_task_inner(addr, TaskType::C2, resource_bytes)
+        self.add_task_inner(addr, comment, TaskType::C2, resource_bytes)
             .await
     }
 
@@ -187,6 +188,7 @@ impl ProxyRpcServer for ProxyImpl {
     async fn add_task(
         &self,
         miner: String,
+        comment: String,
         task_type: TaskType,
         param: Base64Byte,
     ) -> RpcResult<String> {
@@ -198,7 +200,7 @@ impl ProxyRpcServer for ProxyImpl {
             }
         }
 
-        self.add_task_inner(addr, task_type, param.0).await
+        self.add_task_inner(addr, comment, task_type, param.0).await
     }
 
     /// Get task by id
@@ -363,7 +365,6 @@ pub struct WrapClient {
     client: HttpClient,
 }
 
-impl ResourceOp for WrapClient{}
 #[async_trait]
 impl ResourceRepo for WrapClient {
     async fn has_resource(&self, resource_id: String) -> Result<bool> {
@@ -371,10 +372,7 @@ impl ResourceRepo for WrapClient {
     }
 
     async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
-        self.client
-            .get_resource_info(resource_id)
-            .await
-            .anyhow()
+        self.client.get_resource_info(resource_id).await.anyhow()
     }
 
     async fn store_resource_info(&self, resource_id: String, resource: Vec<u8>) -> Result<String> {
@@ -389,6 +387,7 @@ pub trait GpuServiceRpcClient {
         &self,
         phase1_output: Base64Byte,
         miner: String,
+        comment: String,
         prover_id: ProverId,
         sector_id: u64,
     ) -> Result<String>;
@@ -396,6 +395,7 @@ pub trait GpuServiceRpcClient {
     async fn add_task(
         &self,
         miner: String,
+        comment: String,
         task_type: TaskType,
         param: Base64Byte,
     ) -> Result<String>;
@@ -418,12 +418,7 @@ pub trait GpuServiceRpcClient {
 
     async fn get_resource_info(&self, resource_id_arg: String) -> Result<Vec<u8>>;
 
-    async fn record_proof(
-        &self,
-        worker_id_arg: String,
-        tid: String,
-        proof: Vec<u8>,
-    ) -> Result<()>;
+    async fn record_proof(&self, worker_id_arg: String, tid: String, proof: Vec<u8>) -> Result<()>;
 
     async fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String)
         -> Result<()>;
@@ -462,11 +457,12 @@ impl GpuServiceRpcClient for WrapClient {
         &self,
         phase1_output: Base64Byte,
         miner: String,
+        comment: String,
         prover_id: ProverId,
         sector_id: u64,
     ) -> Result<String> {
         self.client
-            .submit_c2_task(phase1_output, miner, prover_id, sector_id)
+            .submit_c2_task(phase1_output, miner, comment, prover_id, sector_id)
             .await
             .anyhow()
     }
@@ -474,10 +470,14 @@ impl GpuServiceRpcClient for WrapClient {
     async fn add_task(
         &self,
         miner: String,
+        comment: String,
         task_type: TaskType,
         param: Base64Byte,
     ) -> Result<String> {
-        self.client.add_task(miner, task_type, param).await.anyhow()
+        self.client
+            .add_task(miner, comment, task_type, param)
+            .await
+            .anyhow()
     }
 
     async fn get_task(&self, id: String) -> Result<Task> {
@@ -500,7 +500,6 @@ impl GpuServiceRpcClient for WrapClient {
         self.client.fetch_todo(worker_id, types).await.anyhow()
     }
 
-
     async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>> {
         self.client.fetch_uncompleted(worker_id_arg).await.anyhow()
     }
@@ -509,16 +508,11 @@ impl GpuServiceRpcClient for WrapClient {
         self.client
             .get_resource_info(resource_id_arg)
             .await
-            .map(|v|v.0)
+            .map(|v| v.0)
             .anyhow()
     }
 
-    async fn record_proof(
-        &self,
-        worker_id_arg: String,
-        tid: String,
-        proof: Vec<u8>,
-    ) -> Result<()> {
+    async fn record_proof(&self, worker_id_arg: String, tid: String, proof: Vec<u8>) -> Result<()> {
         self.client
             .record_proof(worker_id_arg, tid, Base64Byte::new(proof))
             .await

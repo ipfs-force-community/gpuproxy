@@ -9,6 +9,7 @@ use gpuproxy::cli;
 use gpuproxy::config::*;
 use gpuproxy::proxy_rpc::*;
 use gpuproxy::resource;
+use gpuproxy::resource::RpcResource;
 use gpuproxy::utils::ensure_db_file;
 use log::*;
 use migration::Migrator;
@@ -19,7 +20,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::signal::ctrl_c;
 use tokio::signal::unix::{signal, SignalKind};
-use gpuproxy::resource::RpcResource;
 
 #[tokio::main]
 async fn main() {
@@ -169,7 +169,7 @@ async fn run_worker(sub_m: &&ArgMatches) -> Result<()> {
     let worker_id = db_ops.get_worker_id().await?;
 
     let worker_api = Arc::new(rpc::get_proxy_api(cfg.url).await?);
-    let resource: Arc<dyn resource::ResourceOp + Send + Sync >= match cfg.resource {
+    let resource: Arc<dyn resource::ResourceOp + Send + Sync> = match cfg.resource {
         Resource::Db => Arc::new(RpcResource::new(worker_api.clone())),
         Resource::FS(path) => Arc::new(resource::FileResource::new(path)),
     };

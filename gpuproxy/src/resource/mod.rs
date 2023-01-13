@@ -1,4 +1,5 @@
 use crate::config;
+use crate::proxy_rpc::db_ops::ResourceRepo;
 use crate::utils::Base64Byte;
 use anyhow::Context;
 use anyhow::{anyhow, Result};
@@ -13,7 +14,6 @@ use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::proxy_rpc::db_ops::ResourceRepo;
 
 /// The data required for computing c2 type tasks
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,7 +24,8 @@ pub struct C2Resource {
 }
 
 //ResourceOp and ResourceRepo have the same methods in current implementation
-pub trait ResourceOp : ResourceRepo{}
+pub trait ResourceOp: ResourceRepo {}
+impl<T> ResourceOp for T where T: ResourceRepo {}
 
 /// Use files to persist task data
 pub struct FileResource {
@@ -40,9 +41,6 @@ impl FileResource {
 unsafe impl Send for FileResource {}
 unsafe impl Sync for FileResource {}
 
-
-
-impl ResourceOp for FileResource{}
 #[async_trait]
 impl ResourceRepo for FileResource {
     async fn has_resource(&self, resource_id: String) -> Result<bool> {
@@ -78,25 +76,26 @@ impl DbResource {
 unsafe impl Send for DbResource {}
 unsafe impl Sync for DbResource {}
 
-impl ResourceOp for DbResource{}
 #[async_trait]
 impl ResourceRepo for DbResource {
     /// Check if the resource exit
     async fn has_resource(&self, resource_id: String) -> Result<bool> {
-        return self.resource_repo.has_resource(resource_id).await
+        return self.resource_repo.has_resource(resource_id).await;
     }
 
     /// get task resource by resource id
     async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
-        return self.resource_repo.get_resource_info(resource_id).await
+        return self.resource_repo.get_resource_info(resource_id).await;
     }
 
     /// save task resource to file system
     async fn store_resource_info(&self, resource_id: String, resource: Vec<u8>) -> Result<String> {
-        return self.resource_repo.store_resource_info(resource_id, resource).await
+        return self
+            .resource_repo
+            .store_resource_info(resource_id, resource)
+            .await;
     }
 }
-
 
 pub type RpcResource = DbResource;
 

@@ -1,7 +1,7 @@
-use sea_orm_migration::prelude::*;
-
 use entity::tasks as Tasks;
 use log::warn;
+use sea_orm_migration::prelude::*;
+use sea_query::Index;
 
 pub struct Migration;
 
@@ -16,7 +16,7 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .create_index(
-                sea_query::Index::create()
+                Index::create()
                     .table(Tasks::Entity)
                     .name("tasks_create_at")
                     .col(Tasks::Column::CreateAt)
@@ -28,7 +28,7 @@ impl MigrationTrait for Migration {
 
         manager
             .create_index(
-                sea_query::Index::create()
+                Index::create()
                     .table(Tasks::Entity)
                     .name("tasks_start_at")
                     .col(Tasks::Column::StartAt)
@@ -40,7 +40,7 @@ impl MigrationTrait for Migration {
 
         manager
             .create_index(
-                sea_query::Index::create()
+                Index::create()
                     .table(Tasks::Entity)
                     .name("tasks_complete_at")
                     .col(Tasks::Column::CompleteAt)
@@ -52,7 +52,7 @@ impl MigrationTrait for Migration {
 
         manager
             .create_index(
-                sea_query::Index::create()
+                Index::create()
                     .table(Tasks::Entity)
                     .name("tasks_state")
                     .col(Tasks::Column::State)
@@ -64,7 +64,7 @@ impl MigrationTrait for Migration {
 
         manager
             .create_index(
-                sea_query::Index::create()
+                Index::create()
                     .table(Tasks::Entity)
                     .name("tasks_tasktype")
                     .col(Tasks::Column::TaskType)
@@ -76,7 +76,7 @@ impl MigrationTrait for Migration {
 
         manager
             .create_index(
-                sea_query::Index::create()
+                Index::create()
                     .table(Tasks::Entity)
                     .name("tasks_worker_id")
                     .col(Tasks::Column::WorkerId)
@@ -88,7 +88,7 @@ impl MigrationTrait for Migration {
 
         manager
             .create_index(
-                sea_query::Index::create()
+                Index::create()
                     .table(Tasks::Entity)
                     .name("tasks_workerid_state")
                     .col(Tasks::Column::WorkerId)
@@ -101,7 +101,7 @@ impl MigrationTrait for Migration {
 
         manager
             .create_index(
-                sea_query::Index::create()
+                Index::create()
                     .table(Tasks::Entity)
                     .name("tasks_workerid_tasktype")
                     .col(Tasks::Column::WorkerId)
