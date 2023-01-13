@@ -26,6 +26,7 @@ use jsonrpsee::RpcModule;
 use std::sync::Arc;
 use uuid::Uuid;
 use ResourceInfos::Model as ResourceInfo;
+use resource::ResourceOp;
 
 pub const ONE_GIB: u32 = 1024 * 1024 * 1024;
 
@@ -60,9 +61,6 @@ pub trait ProxyRpc {
 
     #[method(name = "Proof.FetchUncomplete")]
     async fn fetch_uncompleted(&self, worker_id_arg: String) -> RpcResult<Vec<Task>>;
-
-    #[method(name = "Proof.GetResourceInfo")]
-    async fn get_resource_info(&self, resource_id_arg: String) -> RpcResult<Base64Byte>;
 
     #[method(name = "Proof.RecordProof")]
     async fn record_proof(
@@ -102,6 +100,12 @@ pub trait ProxyRpc {
         support_types: String,
     ) -> RpcResult<()>;
 
+
+
+    #[method(name = "Proof.GetResourceInfo")]
+    async fn get_resource_info(&self, resource_id_arg: String) -> RpcResult<Base64Byte>;
+
+
     #[method(name = "Proof.ListWorker")]
     async fn list_worker(&self) -> RpcResult<Vec<WorkerState>>;
 
@@ -122,8 +126,8 @@ pub trait ProxyRpc {
 }
 
 pub struct ProxyImpl {
-    resource: Arc<dyn resource::Resource + Send + Sync>,
-    pool: Arc<dyn DbOp + Send + Sync>,
+    resource: Arc<dyn resource::ResourceOp + Send + Sync>,
+    pool: Arc<dyn Repo + Send + Sync>,
 }
 
 impl ProxyImpl {
@@ -331,8 +335,8 @@ impl ProxyRpcServer for ProxyImpl {
 
 /// new proxy apu impl and get rpc moudle
 pub fn register(
-    resource: Arc<dyn resource::Resource + Send + Sync>,
-    pool: Arc<dyn DbOp + Send + Sync>,
+    resource: Arc<dyn resource::ResourceOp + Send + Sync>,
+    pool: Arc<dyn Repo + Send + Sync>,
 ) -> RpcModule<ProxyImpl> {
     let proof_impl = ProxyImpl { resource, pool };
     proof_impl.into_rpc()
@@ -359,65 +363,26 @@ pub struct WrapClient {
     client: HttpClient,
 }
 
+impl ResourceOp for WrapClient{}
 #[async_trait]
-impl resource::Resource for WrapClient {
+impl ResourceRepo for WrapClient {
     async fn has_resource(&self, resource_id: String) -> Result<bool> {
-        Err(anyhow!("not support set resource in worker"))
+        Err(anyhow!("not support set resource in rpc"))
     }
 
-    async fn get_resource_info(&self, resource_id_arg: String) -> Result<Base64Byte> {
+    async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte> {
         self.client
-            .get_resource_info(resource_id_arg)
+            .get_resource_info(resource_id)
             .await
             .anyhow()
     }
 
-    async fn store_resource_info(&self, _: String, _: Vec<u8>) -> Result<String> {
-        Err(anyhow!("not support set resource in worker"))
+    async fn store_resource_info(&self, resource_id: String, resource: Vec<u8>) -> Result<String> {
+        Err(anyhow!("not support store resource in rpc"))
     }
 }
 
-#[async_trait]
-impl WorkerFetch for WrapClient {
-    async fn fetch_one_todo(
-        &self,
-        worker_id: String,
-        types: Option<Vec<entity::TaskType>>,
-    ) -> Result<Task> {
-        self.client.fetch_todo(worker_id, types).await.anyhow()
-    }
-
-    async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>> {
-        self.client.fetch_uncompleted(worker_id_arg).await.anyhow()
-    }
-
-    async fn record_error(&self, worker_id: String, tid: String, err_msg: String) -> Result<()> {
-        self.client
-            .record_error(worker_id, tid, err_msg)
-            .await
-            .anyhow()
-    }
-
-    async fn record_proof(&self, worker_id: String, tid: String, proof: Vec<u8>) -> Result<()> {
-        self.client
-            .record_proof(worker_id, tid, Base64Byte(proof))
-            .await
-            .anyhow()
-    }
-
-    async fn report_worker_info(
-        &self,
-        worker_id_arg: String,
-        ips: String,
-        support_types: String,
-    ) -> Result<()> {
-        self.client
-            .report_worker_info(worker_id_arg, ips, support_types)
-            .await
-            .anyhow()
-    }
-}
-
+//just for better code completion
 #[async_trait]
 pub trait GpuServiceRpcClient {
     async fn submit_c2_task(
@@ -443,15 +408,21 @@ pub trait GpuServiceRpcClient {
         types: Option<Vec<entity::TaskType>>,
     ) -> Result<Task>;
 
+    async fn fetch_one_todo(
+        &self,
+        worker_id: String,
+        types: Option<Vec<entity::TaskType>>,
+    ) -> Result<Task>;
+
     async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>>;
 
-    async fn get_resource_info(&self, resource_id_arg: String) -> Result<Base64Byte>;
+    async fn get_resource_info(&self, resource_id_arg: String) -> Result<Vec<u8>>;
 
     async fn record_proof(
         &self,
         worker_id_arg: String,
         tid: String,
-        proof: Base64Byte,
+        proof: Vec<u8>,
     ) -> Result<()>;
 
     async fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String)
@@ -521,14 +492,24 @@ impl GpuServiceRpcClient for WrapClient {
         self.client.fetch_todo(worker_id_arg, types).await.anyhow()
     }
 
+    async fn fetch_one_todo(
+        &self,
+        worker_id: String,
+        types: Option<Vec<entity::TaskType>>,
+    ) -> Result<Task> {
+        self.client.fetch_todo(worker_id, types).await.anyhow()
+    }
+
+
     async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>> {
         self.client.fetch_uncompleted(worker_id_arg).await.anyhow()
     }
 
-    async fn get_resource_info(&self, resource_id_arg: String) -> Result<Base64Byte> {
+    async fn get_resource_info(&self, resource_id_arg: String) -> Result<Vec<u8>> {
         self.client
             .get_resource_info(resource_id_arg)
             .await
+            .map(|v|v.0)
             .anyhow()
     }
 
@@ -536,10 +517,10 @@ impl GpuServiceRpcClient for WrapClient {
         &self,
         worker_id_arg: String,
         tid: String,
-        proof: Base64Byte,
+        proof: Vec<u8>,
     ) -> Result<()> {
         self.client
-            .record_proof(worker_id_arg, tid, proof)
+            .record_proof(worker_id_arg, tid, Base64Byte::new(proof))
             .await
             .anyhow()
     }

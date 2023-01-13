@@ -11,7 +11,6 @@ use Tasks::Model as Task;
 use WorkerInfos::Model as WorkerInfo;
 use WorkersStates::Model as WorkerState;
 
-use crate::resource::Resource;
 use crate::utils::Base64Byte;
 use crate::utils::*;
 use anyhow::{anyhow, Error, Result};
@@ -29,31 +28,21 @@ use sea_orm::TransactionTrait;
 use sea_orm::{DatabaseConnection, NotSet, QueryOrder, QuerySelect};
 
 #[async_trait]
-pub trait WorkerApi {
+pub trait WorkerRepo {
     async fn get_worker_id(&self) -> Result<uuid::Uuid>;
 }
 
+/// Persist task related data and can implement specific storage media to save data
 #[async_trait]
-pub trait WorkerFetch {
-    async fn fetch_one_todo(
-        &self,
-        worker_id_arg: String,
-        types: Option<Vec<entity::TaskType>>,
-    ) -> Result<Task>;
-    async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>>;
-    async fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String)
-        -> Result<()>;
-    async fn record_proof(&self, worker_id_arg: String, tid: String, proof: Vec<u8>) -> Result<()>;
-    async fn report_worker_info(
-        &self,
-        worker_id_arg: String,
-        ips: String,
-        support_types: String,
-    ) -> Result<()>;
+pub trait ResourceRepo {
+    async fn has_resource(&self, resource_id: String) -> Result<bool>;
+    async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte>;
+    async fn store_resource_info(&self, resource_id: String, resource: Vec<u8>) -> Result<String>;
 }
 
+
 #[async_trait]
-pub trait Common {
+pub trait TaskRepo {
     async fn add_task(
         &self,
         task_id: String,
@@ -71,6 +60,25 @@ pub trait Common {
         worker_id_arg: Option<String>,
         state: Option<Vec<entity::TaskState>>,
     ) -> Result<Vec<Task>>;
+    async fn fetch_one_todo(
+        &self,
+        worker_id_arg: String,
+        types: Option<Vec<entity::TaskType>>,
+    ) -> Result<Task>;
+    async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>>;
+    async fn record_error(&self, worker_id_arg: String, tid: String, err_msg: String)
+                          -> Result<()>;
+    async fn record_proof(&self, worker_id_arg: String, tid: String, proof: Vec<u8>) -> Result<()>;
+}
+
+#[async_trait]
+pub trait WorkerStateRepo {
+    async fn report_worker_info(
+        &self,
+        worker_id_arg: String,
+        ips: String,
+        support_types: String,
+    ) -> Result<()>;
 
     async fn list_worker(&self) -> Result<Vec<WorkerState>>;
     async fn delete_worker_by_worker_id(&self, worker_id_arg: String) -> Result<()>;
@@ -80,8 +88,8 @@ pub trait Common {
     async fn get_offline_worker(&self, dur: i64) -> Result<Vec<WorkerState>>;
 }
 
-pub trait DbOp: WorkerApi + WorkerFetch + Common {}
-impl<T> DbOp for T where T: WorkerApi + WorkerFetch + Common {}
+pub trait Repo: ResourceRepo + WorkerRepo + TaskRepo + WorkerStateRepo{}
+impl<T> Repo for T where T:ResourceRepo +  WorkerRepo + TaskRepo + WorkerStateRepo{}
 
 pub struct DbOpsImpl {
     conn: DatabaseConnection,
@@ -94,7 +102,7 @@ impl DbOpsImpl {
 }
 
 #[async_trait]
-impl WorkerApi for DbOpsImpl {
+impl WorkerRepo for DbOpsImpl {
     async fn get_worker_id(&self) -> Result<uuid::Uuid> {
         let worker_info_op: Option<WorkerInfo> =
             WorkerInfos::Entity::find().one(&self.conn).await?;
@@ -115,139 +123,7 @@ impl WorkerApi for DbOpsImpl {
 }
 
 #[async_trait]
-impl WorkerFetch for DbOpsImpl {
-    async fn fetch_one_todo(
-        &self,
-        worker_id_arg: String,
-        types: Option<Vec<entity::TaskType>>,
-    ) -> Result<Task> {
-        self.conn
-            .transaction::<_, Task, DbErr>(|txn| {
-                Box::pin(async move {
-                    let mut query =
-                        Tasks::Entity::find().filter(Tasks::Column::State.eq(TaskState::Init));
-                    if let Some(state_arg) = types {
-                        query = query.filter(Tasks::Column::TaskType.is_in(state_arg));
-                    }
-                    query = query.order_by(Tasks::Column::CreateAt, Order::Asc);
-
-                    let undo_task_opt: Option<Task> = query.one(txn).await?;
-                    if let Some(undo_task) = undo_task_opt {
-                        let mut undo_task_active: Tasks::ActiveModel = undo_task.into();
-                        undo_task_active.state = Set(TaskState::Running);
-                        undo_task_active.worker_id = Set(worker_id_arg);
-                        undo_task_active.start_at = Set(Utc::now().timestamp());
-                        undo_task_active.update(txn).await
-                    } else {
-                        Err(DbErr::RecordNotFound("no task to do for worker".to_owned()))
-                    }
-                })
-            })
-            .await
-            .anyhow()
-    }
-
-    async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>> {
-        Tasks::Entity::find()
-            .filter(Tasks::Column::State.eq(TaskState::Running))
-            .filter(Tasks::Column::WorkerId.eq(worker_id_arg))
-            .order_by(Tasks::Column::CreateAt, Order::Asc)
-            .all(&self.conn)
-            .await
-            .map_err(|e| anyhow!(e.to_string()))
-    }
-
-    async fn record_error(
-        &self,
-        worker_id_arg: String,
-        tid: String,
-        err_msg_str: String,
-    ) -> Result<()> {
-        Tasks::Entity::update_many()
-            .col_expr(Tasks::Column::State, Expr::value(TaskState::Error))
-            .col_expr(Tasks::Column::WorkerId, Expr::value(worker_id_arg.clone()))
-            .col_expr(Tasks::Column::ErrorMsg, Expr::value(err_msg_str.clone()))
-            .filter(Tasks::Column::Id.eq(tid.clone()))
-            .exec(&self.conn)
-            .await
-            .map(|_| {
-                info!(
-                    "worker {} mark task {} as error reason:{}",
-                    worker_id_arg, tid, err_msg_str
-                );
-            })
-            .anyhow()
-    }
-
-    async fn record_proof(
-        &self,
-        worker_id_arg: String,
-        tid: String,
-        proof_str: Vec<u8>,
-    ) -> Result<()> {
-        Tasks::Entity::update_many()
-            .col_expr(Tasks::Column::State, Expr::value(TaskState::Completed))
-            .col_expr(Tasks::Column::WorkerId, Expr::value(worker_id_arg.clone()))
-            .col_expr(Tasks::Column::Proof, Expr::value(proof_str))
-            .col_expr(Tasks::Column::ErrorMsg, Expr::value(""))
-            .col_expr(
-                Tasks::Column::CompleteAt,
-                Expr::value(Utc::now().timestamp()),
-            )
-            .filter(Tasks::Column::Id.eq(tid.clone()))
-            .exec(&self.conn)
-            .await
-            .map(|_| {
-                info!(
-                    "worker {} complete task {} successfully",
-                    worker_id_arg, tid
-                );
-            })
-            .anyhow()
-    }
-
-    async fn report_worker_info(
-        &self,
-        worker_id_arg: String,
-        ips: String,
-        support_types: String,
-    ) -> Result<()> {
-        let workers_state_opt: Option<WorkerState> = WorkersStates::Entity::find()
-            .filter(WorkersStates::Column::WorkerId.eq(worker_id_arg.clone()))
-            .one(&self.conn)
-            .await
-            .anyhow()?;
-        match workers_state_opt {
-            Some(worker_state) => {
-                let mut worker_state_model: WorkersStates::ActiveModel = worker_state.into();
-                worker_state_model.worker_id = Set(worker_id_arg.clone());
-                worker_state_model.ips = Set(ips.clone());
-                worker_state_model.support_types = Set(support_types.clone());
-                worker_state_model.update_at = Set(Utc::now().timestamp());
-                worker_state_model
-                    .update(&self.conn)
-                    .await
-                    .anyhow()
-                    .map(|_| ())
-            }
-            None => {
-                let new_worker_state_id = Uuid::new_v4().to_string();
-                let new_worker = WorkersStates::ActiveModel {
-                    id: Set(new_worker_state_id),
-                    worker_id: Set(worker_id_arg.clone()),
-                    ips: Set(ips.clone()),
-                    support_types: Set(support_types.clone()),
-                    update_at: Set(Utc::now().timestamp()),
-                    create_at: Set(Utc::now().timestamp()),
-                };
-                new_worker.insert(&self.conn).await.anyhow().map(|_| ())
-            }
-        }
-    }
-}
-
-#[async_trait]
-impl Common for DbOpsImpl {
+impl TaskRepo for DbOpsImpl {
     async fn add_task(
         &self,
         task_id: String,
@@ -338,6 +214,138 @@ impl Common for DbOpsImpl {
         query.all(&self.conn).await.anyhow()
     }
 
+    async fn fetch_one_todo(
+        &self,
+        worker_id_arg: String,
+        types: Option<Vec<entity::TaskType>>,
+    ) -> Result<Task> {
+        self.conn
+            .transaction::<_, Task, DbErr>(|txn| {
+                Box::pin(async move {
+                    let mut query =
+                        Tasks::Entity::find().filter(Tasks::Column::State.eq(TaskState::Init));
+                    if let Some(state_arg) = types {
+                        query = query.filter(Tasks::Column::TaskType.is_in(state_arg));
+                    }
+                    query = query.order_by(Tasks::Column::CreateAt, Order::Asc);
+
+                    let undo_task_opt: Option<Task> = query.one(txn).await?;
+                    if let Some(undo_task) = undo_task_opt {
+                        let mut undo_task_active: Tasks::ActiveModel = undo_task.into();
+                        undo_task_active.state = Set(TaskState::Running);
+                        undo_task_active.worker_id = Set(worker_id_arg);
+                        undo_task_active.start_at = Set(Utc::now().timestamp());
+                        undo_task_active.update(txn).await
+                    } else {
+                        Err(DbErr::RecordNotFound("no task to do for worker".to_owned()))
+                    }
+                })
+            })
+            .await
+            .anyhow()
+    }
+
+    async fn fetch_uncompleted(&self, worker_id_arg: String) -> Result<Vec<Task>> {
+        Tasks::Entity::find()
+            .filter(Tasks::Column::State.eq(TaskState::Running))
+            .filter(Tasks::Column::WorkerId.eq(worker_id_arg))
+            .order_by(Tasks::Column::CreateAt, Order::Asc)
+            .all(&self.conn)
+            .await
+            .map_err(|e| anyhow!(e.to_string()))
+    }
+
+    async fn record_error(
+        &self,
+        worker_id_arg: String,
+        tid: String,
+        err_msg_str: String,
+    ) -> Result<()> {
+        Tasks::Entity::update_many()
+            .col_expr(Tasks::Column::State, Expr::value(TaskState::Error))
+            .col_expr(Tasks::Column::WorkerId, Expr::value(worker_id_arg.clone()))
+            .col_expr(Tasks::Column::ErrorMsg, Expr::value(err_msg_str.clone()))
+            .filter(Tasks::Column::Id.eq(tid.clone()))
+            .exec(&self.conn)
+            .await
+            .map(|_| {
+                info!(
+                    "worker {} mark task {} as error reason:{}",
+                    worker_id_arg, tid, err_msg_str
+                );
+            })
+            .anyhow()
+    }
+
+    async fn record_proof(
+        &self,
+        worker_id_arg: String,
+        tid: String,
+        proof_str: Vec<u8>,
+    ) -> Result<()> {
+        Tasks::Entity::update_many()
+            .col_expr(Tasks::Column::State, Expr::value(TaskState::Completed))
+            .col_expr(Tasks::Column::WorkerId, Expr::value(worker_id_arg.clone()))
+            .col_expr(Tasks::Column::Proof, Expr::value(proof_str))
+            .col_expr(Tasks::Column::ErrorMsg, Expr::value(""))
+            .col_expr(
+                Tasks::Column::CompleteAt,
+                Expr::value(Utc::now().timestamp()),
+            )
+            .filter(Tasks::Column::Id.eq(tid.clone()))
+            .exec(&self.conn)
+            .await
+            .map(|_| {
+                info!(
+                    "worker {} complete task {} successfully",
+                    worker_id_arg, tid
+                );
+            })
+            .anyhow()
+    }
+}
+
+#[async_trait]
+impl WorkerStateRepo for DbOpsImpl {
+    async fn report_worker_info(
+        &self,
+        worker_id_arg: String,
+        ips: String,
+        support_types: String,
+    ) -> Result<()> {
+        let workers_state_opt: Option<WorkerState> = WorkersStates::Entity::find()
+            .filter(WorkersStates::Column::WorkerId.eq(worker_id_arg.clone()))
+            .one(&self.conn)
+            .await
+            .anyhow()?;
+        match workers_state_opt {
+            Some(worker_state) => {
+                let mut worker_state_model: WorkersStates::ActiveModel = worker_state.into();
+                worker_state_model.worker_id = Set(worker_id_arg.clone());
+                worker_state_model.ips = Set(ips.clone());
+                worker_state_model.support_types = Set(support_types.clone());
+                worker_state_model.update_at = Set(Utc::now().timestamp());
+                worker_state_model
+                    .update(&self.conn)
+                    .await
+                    .anyhow()
+                    .map(|_| ())
+            }
+            None => {
+                let new_worker_state_id = Uuid::new_v4().to_string();
+                let new_worker = WorkersStates::ActiveModel {
+                    id: Set(new_worker_state_id),
+                    worker_id: Set(worker_id_arg.clone()),
+                    ips: Set(ips.clone()),
+                    support_types: Set(support_types.clone()),
+                    update_at: Set(Utc::now().timestamp()),
+                    create_at: Set(Utc::now().timestamp()),
+                };
+                new_worker.insert(&self.conn).await.anyhow().map(|_| ())
+            }
+        }
+    }
+
     async fn list_worker(&self) -> Result<Vec<WorkerState>> {
         WorkersStates::Entity::find()
             .order_by(WorkersStates::Column::CreateAt, Order::Desc)
@@ -394,7 +402,7 @@ impl Common for DbOpsImpl {
 }
 
 #[async_trait]
-impl Resource for DbOpsImpl {
+impl ResourceRepo for DbOpsImpl {
     async fn has_resource(&self, resource_id: String) -> Result<bool> {
         ResourceInfos::Entity::find()
             .filter(ResourceInfos::Column::Id.eq(resource_id))
