@@ -62,7 +62,7 @@ impl ResourceRepo for FileResource {
     }
 }
 
-/// Use files to persist task data
+/// Use database to persist task data
 pub struct DbResource {
     resource_repo: Arc<dyn ResourceRepo + Send + Sync>,
 }
@@ -97,6 +97,7 @@ impl ResourceRepo for DbResource {
     }
 }
 
+/// Use rpc to get task data (not support set task data by rpc)
 pub type RpcResource = DbResource;
 
 #[test]

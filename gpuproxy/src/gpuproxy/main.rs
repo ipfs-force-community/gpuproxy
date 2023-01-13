@@ -171,7 +171,7 @@ async fn start_server(sub_m: &&ArgMatches) -> Result<()> {
     let lv = LevelFilter::from_str(cfg.log_level.as_str())?;
     TermLogger::init(
         lv,
-        Config::default(),
+        ConfigBuilder::new().set_time_format_rfc3339().build(),
         TerminalMode::Mixed,
         ColorChoice::Auto,
     )?;

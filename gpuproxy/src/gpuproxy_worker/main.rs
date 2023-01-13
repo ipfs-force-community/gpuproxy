@@ -18,7 +18,6 @@ use sea_orm_migration::migrator::MigratorTrait;
 use simplelog::*;
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio::signal::ctrl_c;
 use tokio::signal::unix::{signal, SignalKind};
 
 #[tokio::main]
@@ -150,9 +149,10 @@ async fn run_worker(sub_m: &&ArgMatches) -> Result<()> {
     );
 
     let lv = LevelFilter::from_str(cfg.log_level.as_str())?;
+
     TermLogger::init(
         lv,
-        Config::default(),
+        ConfigBuilder::new().set_time_format_rfc3339().build(),
         TerminalMode::Mixed,
         ColorChoice::Auto,
     )?;
@@ -190,7 +190,6 @@ async fn run_worker(sub_m: &&ArgMatches) -> Result<()> {
     tokio::select! {
         _ = sig_int.recv() => info!("receive SIGINT"),
         _ = sig_term.recv() => info!("receive SIGTERM"),
-        _ = ctrl_c() => info!("receive Ctrl C"),
     }
     info!("Shutdown program");
     Ok(())
