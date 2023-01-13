@@ -1,4 +1,4 @@
-use std::ops::DerefMut;
+use std::fmt;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
 use storage_proofs_core::sector::SectorId;
 use tokio::{
-    io::{self, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader, BufWriter},
+    io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
     sync::Mutex,
     time::{sleep, Duration},
 };
@@ -110,12 +110,12 @@ async fn main() {
 async fn run(cfg: C2PluginCfg) -> Result<()> {
     let c2_stage_name = "c2";
 
-    let mut stdout = BufWriter::new(io::stdout());
-
-    write_all(&mut stdout, ready_msg(c2_stage_name).as_bytes()).await?;
+    let plugin_out = PluginOut::new();
+    plugin_out
+        .write_all(ready_msg(c2_stage_name).as_bytes())
+        .await?;
 
     let pid = std::process::id();
-    let output = Arc::new(Mutex::new(stdout));
     let mut input = BufReader::new(io::stdin()).lines();
 
     info!("stage {}, pid {} processor ready", c2_stage_name, pid);
@@ -131,11 +131,14 @@ async fn run(cfg: C2PluginCfg) -> Result<()> {
 
         debug!("process request id {}, size {}", req.id, line.len());
         let cfg_clone = cfg.clone();
-
-        let output_cloned = output.clone();
+        let plugin_out_cloned = plugin_out.clone();
         tokio::spawn(async move {
-            if let Err(e) = process_request(cfg_clone, req, output_cloned).await {
-                error!("failed: {:?}", e);
+            let id = req.id;
+            if let Err(e) = match process_request(cfg_clone, req).await {
+                Ok(output_val) => plugin_out_cloned.write_value(id, output_val).await,
+                Err(e) => plugin_out_cloned.write_err(id, e).await,
+            } {
+                error!("write std out failed {}", e) //cant report this error to venus cluster
             }
         });
     }
@@ -146,9 +149,7 @@ async fn run(cfg: C2PluginCfg) -> Result<()> {
 async fn process_request(
     cfg: C2PluginCfg,
     req: Request<C2Input>,
-    output: Arc<Mutex<impl AsyncWrite + Unpin>>,
-) -> Result<()> {
-    let id = req.id;
+) -> Result<SealCommitPhase2Output> {
     let sector_id = req.task.sector_id;
     let input = req.task;
 
@@ -198,7 +199,7 @@ async fn process_request(
                     .await
                     .context("add task")?;
                 info!(
-                    "create new task miner_id {}  task_id{} sector_id {} successfully",
+                    "create new task miner_id {}  task_id {} sector_id {} successfully",
                     input.miner_id,
                     task_id.clone(),
                     sector_id
@@ -209,28 +210,7 @@ async fn process_request(
         }
     }
 
-    let resp = match trace_task_result(cfg, sector_id, task_id, proxy_client).await {
-        Ok(out) => Response {
-            id,
-            err_msg: None,
-            output: Some(out),
-        },
-
-        Err(e) => Response {
-            id,
-            err_msg: Some(format!("{:?}", e)),
-            output: None,
-        },
-    };
-
-    let mut res_str = to_string(&resp).context("marshal response")?;
-    res_str.push('\n');
-    let mut output = output.lock().await;
-    write_all(output.deref_mut(), res_str.as_bytes())
-        .await
-        .context("write response to stdout")?;
-    debug!("response written");
-    Ok(())
+    trace_task_result(cfg, sector_id, task_id, proxy_client).await
 }
 
 async fn trace_task_result(
@@ -249,7 +229,7 @@ async fn trace_task_result(
                     //发生错误 退出当前执行的任务
                     return Err(anyhow!(
                         "task {} sector {} error reason:{}",
-                        task.id,
+                        task_id,
                         sector_id,
                         task.error_msg
                     ));
@@ -267,8 +247,48 @@ async fn trace_task_result(
     }
 }
 
-#[inline]
-async fn write_all<W: AsyncWrite + Unpin>(w: &mut W, data: &[u8]) -> io::Result<()> {
-    w.write_all(data).await?;
-    w.flush().await
+#[derive(Clone)]
+struct PluginOut {
+    writer: Arc<Mutex<BufWriter<io::Stdout>>>,
+}
+
+impl PluginOut {
+    fn new() -> Self {
+        PluginOut {
+            writer: Arc::new(Mutex::new(BufWriter::new(io::stdout()))),
+        }
+    }
+
+    async fn write_value<T: serde::Serialize>(&self, id: u64, val: T) -> Result<()> {
+        self.write_resp(Response::<T> {
+            id,
+            err_msg: None,
+            output: Some(val),
+        })
+            .await
+    }
+
+    async fn write_err<E: fmt::Display>(&self, id: u64, err: E) -> Result<()> {
+        self.write_resp(Response::<()> {      //type just mock
+            id,
+            err_msg: Some(format!("{:?}", err.to_string())),
+            output: None,
+        })
+            .await
+    }
+
+    async fn write_resp<T: serde::Serialize>(&self, resp: Response<T>) -> Result<()> {
+        let mut res_str = to_string(&resp).context("marshal response")?;
+        res_str.push('\n');
+        self.write_all(res_str.as_bytes())
+            .await
+            .context("write response to stdout")
+    }
+
+    #[inline]
+    async fn write_all(&self, data: &[u8]) -> io::Result<()> {
+        let mut output = self.writer.lock().await;
+        output.write_all(data).await?;
+        output.flush().await
+    }
 }
