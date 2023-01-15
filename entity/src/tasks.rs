@@ -16,6 +16,7 @@ pub struct Model {
     pub worker_id: String,
     pub task_type: TaskType,
     pub error_msg: String,
+    pub comment: String,
     pub state: TaskState,
     pub create_at: i64,
     pub start_at: i64,

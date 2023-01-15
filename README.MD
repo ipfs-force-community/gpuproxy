@@ -13,7 +13,7 @@ cargo build --release
 ## run gpuproxy
 
 ```shell
-gpuproxy --url <ip>:<port> --log-level <lv> run --db-dsn <database url> --disable-worker <true/false> --fs-resource-path <path> --allow-types <task type> --max-tasks <int> --no-gpu <true/false> --resource-type <db/fs>
+gpuproxy --url <ip>:<port> --log-level <lv> run --db-dsn <database url> --disable-worker <true/false> --fs-resource-path <path> --allow-type <task type> --max-tasks <int> --no-gpu <true/false> --resource-type <db/fs>
 ```
 1. url: the endpoint that the gpuproxy listens
 2. log-level: program log level
@@ -23,12 +23,12 @@ gpuproxy --url <ip>:<port> --log-level <lv> run --db-dsn <database url> --disabl
 6. max-tasks:  how many tasks can run at most
 7. no-gpu: whether to use gpu
 8. resource-type: resource type (fs/db)
-9. allow-types: task types supported by workers
+9. allow-type: task types supported by workers
 
 ### run gpuproxy_worker
 
 ```shell
-gpuproxy_worker run --url http://<ip>:<port> --db-dsn <database url> --fs-resource-path <path> --allow-types <task type> --max-tasks <int> --no-gpu <true/false> --resource-type <db/fs>
+gpuproxy_worker run --url http://<ip>:<port> --db-dsn <database url> --fs-resource-path <path> --allow-type <task type> --max-tasks <int> --no-gpu <true/false> --resource-type <db/fs>
 ```
 
 1. url:  the endpoint that the gpuproxy, connect to the gpuproxy to get the task and submit the execution result

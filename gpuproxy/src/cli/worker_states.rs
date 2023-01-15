@@ -13,7 +13,7 @@ use duration_str::parse;
 use entity::workers_state::Model as WorkerState;
 use tabled::{builder::Builder, Style};
 
-use crate::cli::utils::timestamp_to_string;
+use crate::cli::utils::{short_msg, timestamp_to_string};
 
 pub async fn worker_cmds<'a>() -> Command<'a> {
     Command::new("worker")
@@ -136,18 +136,10 @@ fn print_worker(workers: Vec<WorkerState>) -> Result<()> {
     ]);
 
     for worker in workers {
-        let new_ips = if worker.ips.len() > 30 {
-            let mut pre_ips = worker.ips[..30].to_string();
-            pre_ips.push_str("...");
-            pre_ips
-        } else {
-            worker.ips
-        };
-
         builder = builder.add_row([
             worker.id.as_str(),
             worker.worker_id.as_str(),
-            new_ips.as_str(),
+            short_msg(worker.ips, 20).as_str(),
             worker.support_types.as_str(),
             timestamp_to_string(worker.create_at).as_str(),
             timestamp_to_string(worker.update_at).as_str(),

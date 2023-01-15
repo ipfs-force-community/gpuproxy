@@ -1,5 +1,6 @@
 use crate::proxy_rpc::db_ops::*;
-use crate::resource::{C2Resource, Resource};
+use crate::proxy_rpc::rpc::GpuServiceRpcClient;
+use crate::resource::{C2Resource, ResourceOp};
 use crate::utils::*;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -32,8 +33,8 @@ pub trait Worker {
 pub struct LocalWorker {
     pub worker_id: String,
     pub max_task: usize,
-    pub task_fetcher: Arc<dyn WorkerFetch + Send + Sync>,
-    pub resource: Arc<dyn Resource + Send + Sync>,
+    pub gpuproxy_client: Arc<dyn GpuServiceRpcClient + Send + Sync>,
+    pub resource: Arc<dyn ResourceOp + Send + Sync>,
     pub allow_types: Option<Vec<TaskType>>,
 }
 
@@ -42,13 +43,13 @@ impl LocalWorker {
         max_task: usize,
         worker_id: String,
         allow_types: Option<Vec<TaskType>>,
-        resource: Arc<dyn Resource + Send + Sync>,
-        task_fetcher: Arc<dyn WorkerFetch + Send + Sync>,
+        resource: Arc<dyn ResourceOp + Send + Sync>,
+        gpuproxy_client: Arc<dyn GpuServiceRpcClient + Send + Sync>,
     ) -> Self {
         LocalWorker {
             worker_id,
             max_task,
-            task_fetcher,
+            gpuproxy_client,
             resource,
             allow_types,
         }
@@ -92,13 +93,13 @@ impl Worker for LocalWorker {
         };
 
         let worker_id = self.worker_id.clone();
-        let fetcher = self.task_fetcher.clone();
+        let client = self.gpuproxy_client.clone();
         tokio::spawn(async move {
             let mut interval = time::interval(Duration::from_secs(60));
             loop {
                 interval.tick().await;
 
-                if let Err(err) = fetcher
+                if let Err(err) = client
                     .report_worker_info(worker_id.clone(), ips.clone(), support_types.clone())
                     .await
                 {
@@ -115,11 +116,11 @@ impl Worker for LocalWorker {
 
         {
             let worker_id = self.worker_id.clone();
-            let fetcher = self.task_fetcher.clone();
+            let client = self.gpuproxy_client.clone();
             let count_clone = count.clone();
             tokio::spawn(async move {
                 info!("start task fetcher, wait for new task todo");
-                let mut un_complete_task_result = fetcher
+                let mut un_complete_task_result = client
                     .fetch_uncompleted(worker_id.to_string())
                     .await
                     .expect(
@@ -141,7 +142,7 @@ impl Worker for LocalWorker {
                     if !un_complete_task_result.is_empty() {
                         select_task = un_complete_task_result.pop().unwrap();
                     } else {
-                        match fetcher
+                        match client
                             .fetch_one_todo(worker_id.clone(), self.allow_types.clone())
                             .await
                         {
@@ -168,7 +169,7 @@ impl Worker for LocalWorker {
 
         {
             let worker_id = self.worker_id.clone();
-            let fetcher = self.task_fetcher.clone();
+            let client = self.gpuproxy_client.clone();
             let (result_tx, mut result_rx) = channel(1);
             tokio::spawn(async move {
                 info!(
@@ -218,7 +219,7 @@ impl Worker for LocalWorker {
                                     match exec_result {
                                         Ok(proof_arg) => {
                                             info!("worker {} completed {} success", worker_id.clone(), undo_task.id);
-                                            if let Err(e) = fetcher.record_proof(worker_id.clone(), undo_task.id.clone(), proof_arg.proof).await{
+                                            if let Err(e) = client.record_proof(worker_id.clone(), undo_task.id.clone(), proof_arg.proof).await{
                                                 error!("record proof for task {} error reason {}", undo_task.id.clone(), e.to_string())
                                             }
                                         }
@@ -229,7 +230,7 @@ impl Worker for LocalWorker {
                                                 undo_task.id,
                                                 e.to_string()
                                             );
-                                           if let Err(e) = fetcher.record_error(worker_id.clone(), undo_task.id.clone(), e.to_string()).await{
+                                           if let Err(e) = client.record_error(worker_id.clone(), undo_task.id.clone(), e.to_string()).await{
                                                error!("record error for task {} error reason {}", undo_task.id.clone(), e.to_string())
                                            }
                                         }

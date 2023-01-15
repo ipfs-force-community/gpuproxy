@@ -9,6 +9,7 @@ use gpuproxy::cli;
 use gpuproxy::config::*;
 use gpuproxy::proxy_rpc::*;
 use gpuproxy::resource;
+use gpuproxy::resource::RpcResource;
 use gpuproxy::utils::ensure_db_file;
 use log::*;
 use migration::Migrator;
@@ -17,7 +18,6 @@ use sea_orm_migration::migrator::MigratorTrait;
 use simplelog::*;
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio::signal::ctrl_c;
 use tokio::signal::unix::{signal, SignalKind};
 
 #[tokio::main]
@@ -149,9 +149,10 @@ async fn run_worker(sub_m: &&ArgMatches) -> Result<()> {
     );
 
     let lv = LevelFilter::from_str(cfg.log_level.as_str())?;
+
     TermLogger::init(
         lv,
-        Config::default(),
+        ConfigBuilder::new().set_time_format_rfc3339().build(),
         TerminalMode::Mixed,
         ColorChoice::Auto,
     )?;
@@ -168,8 +169,8 @@ async fn run_worker(sub_m: &&ArgMatches) -> Result<()> {
     let worker_id = db_ops.get_worker_id().await?;
 
     let worker_api = Arc::new(rpc::get_proxy_api(cfg.url).await?);
-    let resource: Arc<dyn resource::Resource + Send + Sync> = match cfg.resource {
-        Resource::Db => worker_api.clone(),
+    let resource: Arc<dyn resource::ResourceOp + Send + Sync> = match cfg.resource {
+        Resource::Db => Arc::new(RpcResource::new(worker_api.clone())),
         Resource::FS(path) => Arc::new(resource::FileResource::new(path)),
     };
 
@@ -189,7 +190,6 @@ async fn run_worker(sub_m: &&ArgMatches) -> Result<()> {
     tokio::select! {
         _ = sig_int.recv() => info!("receive SIGINT"),
         _ = sig_term.recv() => info!("receive SIGTERM"),
-        _ = ctrl_c() => info!("receive Ctrl C"),
     }
     info!("Shutdown program");
     Ok(())

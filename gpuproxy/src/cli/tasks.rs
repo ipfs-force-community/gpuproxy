@@ -6,7 +6,7 @@ use std::fmt::format;
 use std::process::exit;
 use std::rc::Rc;
 
-use crate::cli::utils::timestamp_to_string;
+use crate::cli::utils::{short_msg, timestamp_to_string};
 use crate::proxy_rpc::rpc::{get_proxy_api, GpuServiceRpcClient};
 use chrono::{DateTime, Local, LocalResult, NaiveDateTime, TimeZone, Utc};
 use clap::{Arg, ArgAction, ArgMatches, Command};
@@ -136,6 +136,7 @@ fn print_task(tasks: Vec<Task>) -> Result<()> {
         "Type",
         "State",
         "ResourceId",
+        "Comment",
         "Err",
         "CreateAt",
         "StartAt",
@@ -143,21 +144,14 @@ fn print_task(tasks: Vec<Task>) -> Result<()> {
     ]);
 
     for task in tasks {
-        let new_err_msg = if task.error_msg.len() > 20 {
-            let mut pre_err_msg = task.error_msg[..20].to_string();
-            pre_err_msg.push_str("...");
-            pre_err_msg
-        } else {
-            task.error_msg
-        };
-
         builder = builder.add_row([
             task.id.as_str(),
             task.miner.as_str(),
             task.task_type.to_string().as_str(),
             state_to_string(task.state).as_str(),
             task.resource_id.as_str(),
-            new_err_msg.as_str(),
+            short_msg(task.comment, 30).as_str(),
+            short_msg(task.error_msg, 20).as_str(),
             timestamp_to_string(task.create_at).as_str(),
             timestamp_to_string(task.start_at).as_str(),
             timestamp_to_string(task.complete_at).as_str(),
@@ -178,6 +172,7 @@ fn print_one_task(task: Task) -> Result<()> {
         .add_row(["Type", task.task_type.to_string().as_str()])
         .add_row(["State", state_to_string(task.state).as_str()])
         .add_row(["ResourceId", task.resource_id.as_str()])
+        .add_row(["Comment", task.comment.as_str()])
         .add_row(["Err", task.error_msg.as_str()])
         .add_row(["CreateAt", timestamp_to_string(task.create_at).as_str()])
         .add_row(["StartAt", timestamp_to_string(task.start_at).as_str()])

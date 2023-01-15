@@ -171,7 +171,7 @@ async fn start_server(sub_m: &&ArgMatches) -> Result<()> {
     let lv = LevelFilter::from_str(cfg.log_level.as_str())?;
     TermLogger::init(
         lv,
-        Config::default(),
+        ConfigBuilder::new().set_time_format_rfc3339().build(),
         TerminalMode::Mixed,
         ColorChoice::Auto,
     )?;
@@ -191,28 +191,28 @@ async fn start_server(sub_m: &&ArgMatches) -> Result<()> {
     let worker_id = db_ops.get_worker_id().await?;
     let arc_pool = Arc::new(db_ops);
 
-    let resource: Arc<dyn resource::Resource + Send + Sync> = match cfg.resource {
-        Resource::Db => arc_pool.clone(),
+    let resource: Arc<dyn resource::ResourceOp + Send + Sync> = match cfg.resource {
+        Resource::Db => Arc::new(resource::DbResource::new(arc_pool.clone())),
         Resource::FS(path) => Arc::new(resource::FileResource::new(path)),
     };
 
+    let rpc_module = rpc::register(resource.clone(), arc_pool);
+    let (server_addr, handle) = start_api(cfg.url.as_str(), rpc_module).await?;
+    info!("starting listening {}", server_addr);
+
+    let worker_api = Arc::new(rpc::get_proxy_api(server_addr.to_string()).await?);
     let worker = worker::LocalWorker::new(
         cfg.max_tasks,
         worker_id.to_string(),
         cfg.allow_types,
-        resource.clone(),
-        arc_pool.clone(),
+        resource,
+        worker_api,
     );
-
-    let rpc_module = rpc::register(resource, arc_pool);
     if !cfg.disable_worker {
         worker.register(Some("127.0.0.1".to_owned())).await?;
         worker.process_tasks().await;
         info!("ready for local worker address worker_id {}", worker_id);
     }
-
-    let (server_addr, handle) = start_api(cfg.url.as_str(), rpc_module).await?;
-    info!("starting listening {}", server_addr);
 
     let mut sig_int = signal(SignalKind::interrupt())?;
     let mut sig_term = signal(SignalKind::terminate())?;

@@ -1,7 +1,6 @@
 use sea_orm_migration::prelude::*;
 
 use entity::workers_state as WorkersStates;
-use log::warn;
 
 pub struct Migration;
 
@@ -57,26 +56,5 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
         todo!()
-    }
-}
-
-trait IgnoreExistDbResult {
-    fn ignore_exist(self) -> Result<(), DbErr>;
-}
-
-impl IgnoreExistDbResult for Result<(), DbErr> {
-    fn ignore_exist(self) -> Result<(), DbErr> {
-        match self {
-            Err(e) => {
-                let e_str = e.to_string();
-                if e_str.contains("Duplicate key name") {
-                    warn!("ginore duplicate index {}", e_str);
-                    Ok(())
-                } else {
-                    Err(e)
-                }
-            }
-            _ => Ok(()),
-        }
     }
 }
