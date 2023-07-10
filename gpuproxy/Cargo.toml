@@ -65,9 +65,9 @@ hyper = "0.14.17"
 socket2 = "0.4.4"
 
 # filecoin dependencies
-storage-proofs-core = { version = "~11.0", default-features = false}
-filecoin-proofs = { version = "~11.0", default-features = false}
-filecoin-proofs-api = { version = "~11.0", default-features = false}
+storage-proofs-core = { version = "~14.0", default-features = false}
+filecoin-proofs = { version = "~14.0", default-features = false}
+filecoin-proofs-api = { version = "~14.0", default-features = false}
 
 sea-query = { version = "0.28.0", features = ["thread-safe"] }
 sea-orm-migration = "0.10.5"
@@ -88,6 +88,6 @@ features = ["json"]
 
 
 [features]
-default = ["opencl"]
+default = ["cuda"]
 opencl = ["filecoin-proofs-api/opencl", "filecoin-proofs/opencl", "storage-proofs-core/opencl"]
 cuda = ["filecoin-proofs-api/cuda", "filecoin-proofs/cuda", "storage-proofs-core/cuda"]
