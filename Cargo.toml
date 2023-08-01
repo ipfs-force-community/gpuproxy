@@ -5,3 +5,8 @@ members = [
     "migration",
     "gpuproxy",
 ]
+
+[patch.crates-io]
+bellperson = { git = "https://github.com/ipfs-force-community/bellperson", branch = "v0.24.1-supra-c2" }
+sppark = { git = "https://github.com/supranational/sppark.git", rev = "9a6bed5" }
+blst = { git = "https://github.com/supranational/blst.git", rev = "dce883b" }

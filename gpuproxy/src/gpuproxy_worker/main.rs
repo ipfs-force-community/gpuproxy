@@ -20,15 +20,21 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::signal::unix::{signal, SignalKind};
 
+#[cfg(feature = "supra-c2")]
+const GPUPROXY_WORKER_ABOUT: &str = "gpuproxy worker [supra c2 enabled]";
+#[cfg(not(feature = "supra-c2"))]
+const GPUPROXY_WORKER_ABOUT: &str = "gpuproxy worker";
+
+
 #[tokio::main]
 async fn main() {
     let worker_args = cli::get_worker_arg();
     let app_m = Command::new("gpuproxy-worker")
         .version("0.0.1")
+        .about(GPUPROXY_WORKER_ABOUT)
         .arg_required_else_help(true)
         .subcommand(
             Command::new("run")
-                .about("worker for execute task")
                 .args(&[
                     Arg::new("gpuproxy-url")
                         .long("gpuproxy-url")
