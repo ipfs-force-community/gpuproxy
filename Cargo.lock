@@ -377,7 +377,7 @@ dependencies = [
 [[package]]
 name = "bellperson"
 version = "0.24.1"
-source = "git+https://github.com/ipfs-force-community/bellperson?branch=v0.24.1-supra-c2#9e52e4e6c6051bb6f476b17fb9de15079f8798f7"
+source = "git+https://github.com/ipfs-force-community/bellperson?branch=v0.24.1-supra-c2#e51a1fea0a54dd9183ec7af184f1f6d973f2652c"
 dependencies = [
  "bincode",
  "blake2s_simd 1.0.1",
