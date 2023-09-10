@@ -243,8 +243,13 @@ impl ProxyRpcServer for ProxyImpl {
         tid: String,
         proof: Base64Byte,
     ) -> RpcResult<()> {
+        let task = self.pool.fetch(tid.clone()).await.internal_call_error()?;
         self.pool
             .record_proof(worker_id_arg, tid, proof.0)
+            .await
+            .internal_call_error()?;
+        self.resource
+            .delete_resource(task.resource_id)
             .await
             .internal_call_error()
     }
@@ -376,6 +381,10 @@ impl ResourceRepo for WrapClient {
     }
 
     async fn store_resource_info(&self, resource_id: String, resource: Vec<u8>) -> Result<String> {
+        Err(anyhow!("not support store resource in rpc"))
+    }
+
+    async fn delete_resource(&self, resource_id: String) -> Result<()> {
         Err(anyhow!("not support store resource in rpc"))
     }
 }
