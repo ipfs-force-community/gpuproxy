@@ -192,8 +192,9 @@ async fn start_server(sub_m: &&ArgMatches) -> Result<()> {
     let arc_pool = Arc::new(db_ops);
 
     let resource: Arc<dyn resource::ResourceOp + Send + Sync> = match cfg.resource {
-        Resource::Db => Arc::new(resource::DbResource::new(arc_pool.clone())),
+        Resource::DB => Arc::new(resource::DbResource::new(arc_pool.clone())),
         Resource::FS(path) => Arc::new(resource::FileResource::new(path)),
+        Resource::RPC => return Err(anyhow!("RPC resource type is not support in server")),
     };
 
     let rpc_module = rpc::register(resource.clone(), arc_pool);
