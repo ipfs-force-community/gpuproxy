@@ -60,6 +60,12 @@ impl ResourceRepo for FileResource {
         fs::write(new_path, resource)?;
         Ok(resource_id)
     }
+
+    async fn delete_resource(&self, resource_id: String) -> Result<()> {
+        let new_path = Path::new(self.root.as_str()).join(resource_id.clone());
+        fs::remove_file(new_path)?;
+        Ok(())
+    }
 }
 
 /// Use database to persist task data
@@ -94,6 +100,10 @@ impl ResourceRepo for DbResource {
             .resource_repo
             .store_resource_info(resource_id, resource)
             .await;
+    }
+
+    async fn delete_resource(&self, resource_id: String) -> Result<()> {
+        return self.resource_repo.delete_resource(resource_id).await;
     }
 }
 

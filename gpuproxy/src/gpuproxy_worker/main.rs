@@ -25,12 +25,11 @@ const GPUPROXY_WORKER_ABOUT: &str = "gpuproxy worker [supra c2 enabled]";
 #[cfg(not(feature = "supra-c2"))]
 const GPUPROXY_WORKER_ABOUT: &str = "gpuproxy worker";
 
-
 #[tokio::main]
 async fn main() {
     let worker_args = cli::get_worker_arg();
     let app_m = Command::new("gpuproxy-worker")
-        .version("0.0.1")
+        .version("0.0.2")
         .about(GPUPROXY_WORKER_ABOUT)
         .arg_required_else_help(true)
         .subcommand(
@@ -60,10 +59,8 @@ async fn main() {
                     Arg::new("resource-type")
                         .long("resource-type")
                         .env("C2PROXY_RESOURCE_TYPE")
-                        .default_value("fs")
-                        .help(
-                            "resource type(db(only for test, have bug for executing too long sql), fs)",
-                        ),
+                        .default_value("rpc")
+                        .help("resource type( fs,rpc(default))"),
                     Arg::new("fs-resource-path")
                         .long("fs-resource-path")
                         .env("C2PROXY_FS_RESOURCE_PATH")
@@ -176,8 +173,9 @@ async fn run_worker(sub_m: &&ArgMatches) -> Result<()> {
 
     let worker_api = Arc::new(rpc::get_proxy_api(cfg.url).await?);
     let resource: Arc<dyn resource::ResourceOp + Send + Sync> = match cfg.resource {
-        Resource::Db => Arc::new(RpcResource::new(worker_api.clone())),
+        Resource::RPC => Arc::new(RpcResource::new(worker_api.clone())),
         Resource::FS(path) => Arc::new(resource::FileResource::new(path)),
+        Resource::DB => return Err(anyhow!("db type in worker is deprecated, use rpc instead")),
     };
 
     let worker = worker::LocalWorker::new(

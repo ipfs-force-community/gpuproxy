@@ -38,6 +38,7 @@ pub trait ResourceRepo {
     async fn has_resource(&self, resource_id: String) -> Result<bool>;
     async fn get_resource_info(&self, resource_id: String) -> Result<Base64Byte>;
     async fn store_resource_info(&self, resource_id: String, resource: Vec<u8>) -> Result<String>;
+    async fn delete_resource(&self, resource_id: String) -> Result<()>;
 }
 
 #[async_trait]
@@ -435,6 +436,14 @@ impl ResourceRepo for DbOpsImpl {
             .insert(&self.conn)
             .await
             .map(|_| resource_id)
+            .anyhow()
+    }
+
+    async fn delete_resource(&self, resource_id: String) -> Result<()> {
+        ResourceInfos::Entity::delete_by_id(resource_id)
+            .exec(&self.conn)
+            .await
+            .map(|_| ())
             .anyhow()
     }
 }

@@ -30,7 +30,7 @@ async fn main() {
     let fetch_params_cmds = cli::fetch_params_cmds().await;
     let worker_cmds = cli::worker_cmds().await;
     let app_m = Command::new("gpuproxy")
-        .version("0.0.1")
+        .version("0.0.2")
         .args(&[
             Arg::new("url")
                 .long("url")
@@ -192,8 +192,9 @@ async fn start_server(sub_m: &&ArgMatches) -> Result<()> {
     let arc_pool = Arc::new(db_ops);
 
     let resource: Arc<dyn resource::ResourceOp + Send + Sync> = match cfg.resource {
-        Resource::Db => Arc::new(resource::DbResource::new(arc_pool.clone())),
+        Resource::DB => Arc::new(resource::DbResource::new(arc_pool.clone())),
         Resource::FS(path) => Arc::new(resource::FileResource::new(path)),
+        Resource::RPC => return Err(anyhow!("RPC resource type is not support in server")),
     };
 
     let rpc_module = rpc::register(resource.clone(), arc_pool);

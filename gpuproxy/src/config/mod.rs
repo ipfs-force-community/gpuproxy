@@ -5,7 +5,8 @@ use entity::TaskType;
 /// and the second is file resource that save task parameters in file system
 #[derive(Clone, Debug)]
 pub enum Resource {
-    Db,
+    RPC,
+    DB,
     FS(String),
 }
 
@@ -36,10 +37,10 @@ impl ServiceConfig {
         allow_types: Option<Vec<TaskType>>,
         debug_sql: bool,
     ) -> Self {
-        let resource = if resource_type == "db" {
-            Resource::Db
-        } else {
-            Resource::FS(resource_path)
+        let resource = match resource_type.as_str() {
+            "db" => Resource::DB,
+            "rpc" => Resource::RPC,
+            _ => Resource::FS(resource_path),
         };
 
         Self {
@@ -82,11 +83,12 @@ impl WorkerConfig {
         debug_sql: bool,
         manual_ip: Option<String>,
     ) -> Self {
-        let resource = if resource_type == "db" {
-            Resource::Db
-        } else {
-            Resource::FS(resource_path)
+        let resource = match resource_type.as_str() {
+            "db" => Resource::DB,
+            "rpc" => Resource::RPC,
+            _ => Resource::FS(resource_path),
         };
+
         WorkerConfig {
             url,
             db_dsn,
