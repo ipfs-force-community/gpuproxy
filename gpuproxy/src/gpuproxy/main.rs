@@ -30,7 +30,7 @@ async fn main() {
     let fetch_params_cmds = cli::fetch_params_cmds().await;
     let worker_cmds = cli::worker_cmds().await;
     let app_m = Command::new("gpuproxy")
-        .version("0.0.1")
+        .version("0.0.2")
         .args(&[
             Arg::new("url")
                 .long("url")

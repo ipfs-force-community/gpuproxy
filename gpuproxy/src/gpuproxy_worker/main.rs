@@ -29,7 +29,7 @@ const GPUPROXY_WORKER_ABOUT: &str = "gpuproxy worker";
 async fn main() {
     let worker_args = cli::get_worker_arg();
     let app_m = Command::new("gpuproxy-worker")
-        .version("0.0.1")
+        .version("0.0.2")
         .about(GPUPROXY_WORKER_ABOUT)
         .arg_required_else_help(true)
         .subcommand(
