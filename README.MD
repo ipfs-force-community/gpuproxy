@@ -37,8 +37,8 @@ gpuproxy_worker run --url http://<ip>:<port> --db-dsn <database url> --fs-resour
 4. fs-resource-path: if the resources are stored in file system, then configure the folder path here
 5. max-tasks:  how many tasks can run at most
 6. no-gpu: whether to use gpu
-7. resource-type: resource type (fs/db)
-8。 allow-types: task types supported by workers
+7. resource-type: resource type (fs/db/rpc)
+8. allow-types: task types supported by workers
 
 ### run the gpu proxy plugin with venus-cluster
 
