@@ -54,7 +54,7 @@ duration-str = "0.5.0"
 # params fetch
 flate2 = "1.0.22"
 humansize = "1.1.1"
-reqwest = {version = "0.11.9", features = ["blocking", "native-tls-vendored"]}
+reqwest = { version = "0.11.9", features = ["blocking", "native-tls-vendored"] }
 pbr = "1.0.4"
 tar = "0.4.38"
 
@@ -65,21 +65,15 @@ hyper = "0.14.17"
 socket2 = "0.4.4"
 
 # filecoin dependencies
-storage-proofs-core = { version = "~14.0", default-features = false}
-filecoin-proofs = { version = "~14.0", default-features = false}
-filecoin-proofs-api = { version = "~14.0", default-features = false}
-bellperson = { version = "0.24.1", optional = true }
+storage-proofs-core = { version = "~16.0", default-features = false }
+filecoin-proofs = { version = "~16.0", default-features = false }
+filecoin-proofs-api = { version = "~16.0", default-features = false }
 
 sea-query = { version = "0.28.0", features = ["thread-safe"] }
 sea-orm-migration = "0.10.5"
 [dependencies.sea-orm]
-version ="0.10.5"
-features = [
-    "macros",
-    "runtime-tokio-native-tls",
-    "sqlx-sqlite",
-    "sqlx-mysql",
-]
+version = "0.10.5"
+features = ["macros", "runtime-tokio-native-tls", "sqlx-sqlite", "sqlx-mysql"]
 default-features = false
 
 
@@ -89,7 +83,24 @@ features = ["json"]
 
 
 [features]
-default = ["cuda"]
-opencl = ["filecoin-proofs-api/opencl", "filecoin-proofs/opencl", "storage-proofs-core/opencl"]
-cuda = ["filecoin-proofs-api/cuda", "filecoin-proofs/cuda", "storage-proofs-core/cuda"]
-supra-c2 = ["bellperson/supra-c2"]
+default = ["opencl"]
+opencl = [
+    "filecoin-proofs-api/opencl",
+    "filecoin-proofs/opencl",
+    "storage-proofs-core/opencl",
+]
+cuda = [
+    "filecoin-proofs-api/cuda",
+    "filecoin-proofs/cuda",
+    "storage-proofs-core/cuda",
+]
+cuda-supraseal = [
+    "filecoin-proofs-api/cuda-supraseal",
+    "filecoin-proofs/cuda-supraseal",
+    "storage-proofs-core/cuda-supraseal",
+]
+supra-c2 = [
+    "filecoin-proofs-api/cuda-supraseal",
+    "filecoin-proofs/cuda-supraseal",
+    "storage-proofs-core/cuda-supraseal",
+] # alias cuda-supraseal
