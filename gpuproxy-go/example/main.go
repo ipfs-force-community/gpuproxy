@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/filecoin-project/go-address"
@@ -29,7 +30,7 @@ func main() {
 	defer closer()
 
 	var commit2In Commit2In
-	eightMiB, err := ioutil.ReadFile("/Users/lijunlong/code/gpuproxy/gpuproxy-go/example/2KiB.json")
+	eightMiB, err := os.ReadFile("example/8MiB.json")
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -42,13 +43,15 @@ func main() {
 
 	var proverId [32]byte
 	copy(proverId[:], commit2In.Miner.Payload())
-	rand.Seed(time.Now().Unix())
-	miner, _ := address.NewIDAddress(uint64(rand.Uint32()))
-	taskId, err := client.SubmitC2Task(commit2In.Phase1Out, miner.String(), proverId, commit2In.SectorNum)
+	seedrand := rand.New(rand.NewSource(time.Now().Unix()))
+	miner, _ := address.NewIDAddress(uint64(seedrand.Uint32()))
+	taskId, err := client.SubmitC2Task(commit2In.Phase1Out, miner.String(), "", proverId, commit2In.SectorNum)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
+
+	fmt.Println(taskId)
 	return
 
 	for {

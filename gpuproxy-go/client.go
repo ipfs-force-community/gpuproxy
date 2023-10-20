@@ -2,8 +2,9 @@ package gpuproxy_go
 
 import (
 	"context"
-	"github.com/filecoin-project/go-jsonrpc"
 	"net/http"
+
+	"github.com/filecoin-project/go-jsonrpc"
 )
 
 type TaskStatus int32
@@ -41,7 +42,7 @@ type C2ProxyWorker interface {
 }
 
 type C2ProxyClient interface {
-	SubmitC2Task(phase1_output []byte, miner string, prover_id [32]byte, sector_id int64) (string, error)
+	SubmitC2Task(phase1_output []byte, miner string, comment string, prover_id [32]byte, sector_id int64) (string, error)
 	GetTask(ctx context.Context, id string) (Task, error)
 }
 
