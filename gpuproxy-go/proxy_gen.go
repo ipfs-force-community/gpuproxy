@@ -28,7 +28,7 @@ type C2ProxyClientStruct struct {
 
 	Internal struct {
 	GetTask func(p0 context.Context, p1 string) (Task, error) ``
-	SubmitC2Task func(p1 []byte, p2 string, p3 [32]byte, p4 int64) (string, error) ``
+	SubmitC2Task func(p1 []byte, p2 string,p3 string, p4 [32]byte, p5 int64) (string, error) ``
 
 	}
 }
@@ -63,11 +63,11 @@ func (s *C2ProxyClientStub) GetTask(p0 context.Context, p1 string) (Task, error)
 	return *new(Task), xerrors.New("method not supported")
 }
 
-func (s *C2ProxyClientStruct) SubmitC2Task( p1 []byte, p2 string, p3 [32]byte, p4 int64) (string, error) {
-	return s.Internal.SubmitC2Task(p1, p2, p3, p4)
+func (s *C2ProxyClientStruct) SubmitC2Task( p1 []byte, p2 string,p3 string, p4 [32]byte, p5 int64) (string, error) {
+	return s.Internal.SubmitC2Task(p1, p2, p3, p4, p5)
 }
 
-func (s *C2ProxyClientStub) SubmitC2Task(p1 []byte, p2 string, p3 [32]byte, p4 int64) (string, error) {
+func (s *C2ProxyClientStub) SubmitC2Task(p1 []byte, p2 string,p3 string, p4 [32]byte, p5 int64) (string, error) {
 	return "", xerrors.New("method not supported")
 }
 
