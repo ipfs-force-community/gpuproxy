@@ -13,6 +13,7 @@ use filecoin_proofs_api::seal::{
     seal_commit_phase2, SealCommitPhase1Output, SealCommitPhase2Output,
 };
 use log::*;
+use std::env;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
@@ -171,6 +172,13 @@ impl Worker for LocalWorker {
             let worker_id = self.worker_id.clone();
             let client = self.gpuproxy_client.clone();
             let (result_tx, mut result_rx) = channel(1);
+
+            let retry_sum = env::var("RETRY_SUM")
+                .unwrap_or_else(|_| "5".to_string())
+                .parse::<u32>()
+                .unwrap_or(5);
+            info!("retry sum is {}", retry_sum);
+
             tokio::spawn(async move {
                 info!(
                     "worker {} start to worker and wait for new tasks",
@@ -185,9 +193,17 @@ impl Worker for LocalWorker {
                                         let task_id = undo_task.id.clone();
                                         let resource_id = undo_task.resource_id.clone();
 
-                                        let resource_result = self.resource.get_resource_info(resource_id.clone()).await;
+                                        let mut retry_count = 1;
+                                        let mut resource_result = self.resource.get_resource_info(resource_id.clone()).await;
+                                        while resource_result.is_err() && retry_count <= retry_sum {
+                                            error!("unable to get resource of {}, reason:{}, retry count {}/{}", resource_id.clone(), resource_result.err().unwrap().to_string(), retry_count , retry_sum);
+                                            sleep(Duration::from_secs(15)).await;
+                                            resource_result = self.resource.get_resource_info(resource_id.clone()).await;
+                                            retry_count += 1;
+                                        }
+
                                         if let Err(e) = resource_result {
-                                            error!("unable to get resource of {}, reason:{}", resource_id.clone(), e.to_string());
+                                            error!("unable to get resource of {}, reason:{} , after retry", resource_id.clone(), e.to_string());
                                             count.fetch_sub(1, Ordering::SeqCst);
                                             continue;
                                         }

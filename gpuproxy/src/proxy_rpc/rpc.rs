@@ -1,5 +1,7 @@
 use crate::proxy_rpc::db_ops::*;
 use filecoin_proofs_api::{ProverId, SectorId};
+use log::info;
+use std::env;
 use std::str::FromStr;
 
 use crate::utils::Base64Byte;
@@ -7,6 +9,8 @@ use crate::utils::{IntoAnyhow, IntoJsonRpcResult, ReveseOption};
 use crate::{resource, utils};
 use anyhow::{anyhow, Result};
 use entity::TaskType;
+use humantime::parse_duration;
+use std::time::Duration;
 
 use entity::tasks as Tasks;
 use Tasks::Model as Task;
@@ -358,7 +362,12 @@ pub async fn get_proxy_api(url: String) -> Result<WrapClient> {
         url
     };
 
+    let duration_str = env::var("HTTP_TIMEOUT").unwrap_or("60s".to_owned());
+    let duration = parse_duration(duration_str.as_str())?;
+    info!("http timeout is {:?}", duration);
+
     HttpClientBuilder::default()
+        .request_timeout(duration)
         .max_request_body_size(ONE_GIB)
         .build(new_url.as_str())
         .map(|val| WrapClient { client: val })
