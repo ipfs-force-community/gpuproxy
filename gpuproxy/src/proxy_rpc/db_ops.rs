@@ -234,11 +234,25 @@ impl TaskRepo for DbOpsImpl {
 
                     let undo_task_opt: Option<Task> = query.one(txn).await?;
                     if let Some(undo_task) = undo_task_opt {
-                        let mut undo_task_active: Tasks::ActiveModel = undo_task.into();
-                        undo_task_active.state = Set(TaskState::Running);
-                        undo_task_active.worker_id = Set(worker_id_arg);
-                        undo_task_active.start_at = Set(Utc::now().timestamp());
-                        undo_task_active.update(txn).await
+                        let res = Tasks::Entity::update_many()
+                            .col_expr(Tasks::Column::State, Expr::value(TaskState::Running))
+                            .col_expr(Tasks::Column::WorkerId, Expr::value(worker_id_arg.clone()))
+                            .col_expr(Tasks::Column::StartAt, Expr::value(Utc::now().timestamp()))
+                            .filter(Tasks::Column::Id.eq(undo_task.id.clone()))
+                            .filter(Tasks::Column::State.eq(TaskState::Init))
+                            .exec(txn)
+                            .await?;
+                        if res.rows_affected == 0 {
+                            return Err(DbErr::RecordNotFound(
+                                "no task to do for worker.".to_owned(),
+                            ));
+                        }
+                        Tasks::Entity::find_by_id(task_id.clone())
+                            .one(txn)
+                            .await?
+                            .ok_or_else(|| {
+                                DbErr::RecordNotFound(format!("task not found: {}", task_id))
+                            })
                     } else {
                         Err(DbErr::RecordNotFound("no task to do for worker".to_owned()))
                     }
