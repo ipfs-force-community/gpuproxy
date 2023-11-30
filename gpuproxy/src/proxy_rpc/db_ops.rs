@@ -247,11 +247,11 @@ impl TaskRepo for DbOpsImpl {
                                 "no task to do for worker.".to_owned(),
                             ));
                         }
-                        Tasks::Entity::find_by_id(task_id.clone())
+                        Tasks::Entity::find_by_id(undo_task.id.clone())
                             .one(txn)
                             .await?
                             .ok_or_else(|| {
-                                DbErr::RecordNotFound(format!("task not found: {}", task_id))
+                                DbErr::RecordNotFound(format!("task not found: {}", undo_task.id))
                             })
                     } else {
                         Err(DbErr::RecordNotFound("no task to do for worker".to_owned()))
