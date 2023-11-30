@@ -253,7 +253,7 @@ impl TaskRepo for DbOpsImpl {
                             .one(txn)
                             .await?
                             .ok_or_else(|| {
-                                DbErr::RecordNotFound(format!("failed to find task: {}", task_id))
+                                DbErr::RecordNotFound(format!("task not found: {}", task_id))
                             })
                     } else {
                         Err(DbErr::RecordNotFound("no task to do for worker".to_owned()))
