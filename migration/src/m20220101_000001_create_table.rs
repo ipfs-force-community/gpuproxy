@@ -27,7 +27,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(ResourceInfo::Column::Data)
-                            .binary()
+                            .blob(BlobSize::Long)
                             .not_null(),
                     )
                     .col(

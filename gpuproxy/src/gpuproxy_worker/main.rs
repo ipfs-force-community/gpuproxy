@@ -155,9 +155,9 @@ async fn run_worker(sub_m: &&ArgMatches) -> Result<()> {
 
     TermLogger::init(
         lv,
-        ConfigBuilder::new().set_time_format_rfc3339().build(),
+        ConfigBuilder::new().set_time_to_local(true).build(),
         TerminalMode::Mixed,
-        ColorChoice::Auto,
+        // ColorChoice::Auto,
     )?;
 
     ensure_db_file(&cfg.db_dsn).await?;

@@ -14,7 +14,7 @@ serde_repr = "0.1"
 serde = { version = "1.0.133", features = ["derive"] }
 
 [dependencies.sea-orm]
-version ="0.10.5"
+version ="0.12.10"
 features = [
     "macros",
     "runtime-tokio-native-tls",

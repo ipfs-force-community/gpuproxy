@@ -1,6 +1,8 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use sea_orm::entity::prelude::*;
 use serde_repr::*;
+
+use std::fmt ;
 /// Used to indicate the state of the current task, the inner type is i32
 /// 0 Undefined old state
 /// 1 Init every new task should be init
@@ -61,5 +63,12 @@ pub enum TaskType {
 pub fn task_type_to_string(t: TaskType) -> String {
     match t {
         TaskType::C2 => "C2".to_owned(),
+    }
+}
+
+impl fmt::Display for TaskType {
+    // This trait requires `fmt` with this exact signature.
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", "C2".to_owned())
     }
 }

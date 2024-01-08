@@ -171,9 +171,9 @@ async fn start_server(sub_m: &&ArgMatches) -> Result<()> {
     let lv = LevelFilter::from_str(cfg.log_level.as_str())?;
     TermLogger::init(
         lv,
-        ConfigBuilder::new().set_time_format_rfc3339().build(),
+        ConfigBuilder::new().set_time_to_local(true).build(),
         TerminalMode::Mixed,
-        ColorChoice::Auto,
+        // ColorChoice::Auto,
     )?;
 
     ensure_db_file(&cfg.db_dsn).await?;

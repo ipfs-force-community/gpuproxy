@@ -69,10 +69,10 @@ storage-proofs-core = { version = "~16.0", default-features = false }
 filecoin-proofs = { version = "~16.0", default-features = false }
 filecoin-proofs-api = { version = "~16.0", default-features = false }
 
-sea-query = { version = "0.28.0", features = ["thread-safe"] }
-sea-orm-migration = "0.10.5"
+sea-query = { version = "0.30.5", features = ["thread-safe"] }
+sea-orm-migration = "0.12.10"
 [dependencies.sea-orm]
-version = "0.10.5"
+version = "0.12.10"
 features = ["macros", "runtime-tokio-native-tls", "sqlx-sqlite", "sqlx-mysql"]
 default-features = false
 
