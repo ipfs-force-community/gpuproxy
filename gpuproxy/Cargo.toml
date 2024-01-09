@@ -33,7 +33,7 @@ jsonrpsee = { version = "^0.8.0", features = ["full"] }
 jsonrpsee-core = "0.9.0"
 futures = "0.3.21"
 log = { version = "0.4", features = ["std"] }
-simplelog = "*"
+simplelog = "0.12.0"
 env_logger = "0.9.0"
 forest_address = "0.3.2"
 anyhow = "1.0.52"
@@ -46,7 +46,7 @@ bytes = "1.1.0"
 uuid = { version = "0.8", features = ["v4", "v5"] }
 scopeguard = "1.1.0"
 tokio = { version = "1.24.2", features = ["full"] }
-tabled = { version = "*", features = ["color"] }
+tabled = { version = "0.14.0", features = ["color"] }
 tracing = "0.1"
 local-ip-address = "0.5.1"
 duration-str = "0.5.0"
