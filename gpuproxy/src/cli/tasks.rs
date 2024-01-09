@@ -12,7 +12,8 @@ use chrono::{DateTime, Local, LocalResult, NaiveDateTime, TimeZone, Utc};
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use entity::tasks::Model as Task;
 use entity::{TaskState, TaskType};
-use tabled::{builder::Builder, Style};
+use tabled::builder::Builder;
+use tabled::settings::style::Style;
 
 pub async fn task_cmds<'a>() -> Command<'a> {
     Command::new("task")
@@ -130,7 +131,9 @@ pub async fn update_status_by_id(sub_m: &&ArgMatches) -> Result<()> {
 }
 
 fn print_task(tasks: Vec<Task>) -> Result<()> {
-    let mut builder = Builder::default().set_header([
+    let mut builder = Builder::new();
+
+    builder.set_header([
         "Id",
         "Miner",
         "Type",
@@ -144,7 +147,7 @@ fn print_task(tasks: Vec<Task>) -> Result<()> {
     ]);
 
     for task in tasks {
-        builder = builder.add_row([
+        builder.push_record([
             task.id.as_str(),
             task.miner.as_str(),
             task.task_type.to_string().as_str(),
@@ -157,29 +160,27 @@ fn print_task(tasks: Vec<Task>) -> Result<()> {
             timestamp_to_string(task.complete_at).as_str(),
         ]);
     }
-
-    let table = builder.build().with(Style::ascii());
-    println!("{}", table);
+    println!("{}", builder.build().with(Style::ascii()));
     Ok(())
 }
 
 fn print_one_task(task: Task) -> Result<()> {
-    let table = Builder::default()
-        .set_header(["Name", "Value"])
-        .add_row(["Id", task.id.as_str()])
-        .add_row(["Miner", task.miner.as_str()])
-        .add_row(["Miner", task.miner.as_str()])
-        .add_row(["Type", task.task_type.to_string().as_str()])
-        .add_row(["State", state_to_string(task.state).as_str()])
-        .add_row(["ResourceId", task.resource_id.as_str()])
-        .add_row(["Comment", task.comment.as_str()])
-        .add_row(["Err", task.error_msg.as_str()])
-        .add_row(["CreateAt", timestamp_to_string(task.create_at).as_str()])
-        .add_row(["StartAt", timestamp_to_string(task.start_at).as_str()])
-        .add_row(["CompleteAt", timestamp_to_string(task.complete_at).as_str()])
-        .build()
-        .with(Style::ascii());
-    println!("{}", table);
+    let mut table = Builder::new();
+
+        table.set_header(["Name", "Value"])
+        .push_record(["Id", task.id.as_str()])
+        .push_record(["Miner", task.miner.as_str()])
+        .push_record(["Miner", task.miner.as_str()])
+        .push_record(["Type", task.task_type.to_string().as_str()])
+        .push_record(["State", state_to_string(task.state).as_str()])
+        .push_record(["ResourceId", task.resource_id.as_str()])
+        .push_record(["Comment", task.comment.as_str()])
+        .push_record(["Err", task.error_msg.as_str()])
+        .push_record(["CreateAt", timestamp_to_string(task.create_at).as_str()])
+        .push_record(["StartAt", timestamp_to_string(task.start_at).as_str()])
+        .push_record(["CompleteAt", timestamp_to_string(task.complete_at).as_str()]);
+
+    println!("{}", table.build().with(Style::ascii()));
     Ok(())
 }
 

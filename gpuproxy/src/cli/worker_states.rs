@@ -11,7 +11,8 @@ use chrono::{DateTime, Duration, Local, LocalResult, NaiveDateTime, TimeZone, Ut
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use duration_str::parse;
 use entity::workers_state::Model as WorkerState;
-use tabled::{builder::Builder, Style};
+use tabled::{builder::Builder};
+use tabled::settings::style::Style;
 
 use crate::cli::utils::{short_msg, timestamp_to_string};
 
@@ -126,7 +127,8 @@ pub async fn offline_workers(sub_m: &&ArgMatches) -> Result<()> {
 }
 
 fn print_worker(workers: Vec<WorkerState>) -> Result<()> {
-    let mut builder = Builder::default().set_header([
+    let mut builder = Builder::new();
+    builder.set_header([
         "Id",
         "WorkerId",
         "IPs",
@@ -136,7 +138,7 @@ fn print_worker(workers: Vec<WorkerState>) -> Result<()> {
     ]);
 
     for worker in workers {
-        builder = builder.add_row([
+        builder.push_record([
             worker.id.as_str(),
             worker.worker_id.as_str(),
             short_msg(worker.ips, 20).as_str(),
@@ -146,22 +148,21 @@ fn print_worker(workers: Vec<WorkerState>) -> Result<()> {
         ]);
     }
 
-    let table = builder.build().with(Style::ascii());
+    let table = builder.build();
     println!("{}", table);
     Ok(())
 }
 
 fn print_one_worker(worker: WorkerState) -> Result<()> {
-    let table = Builder::default()
-        .set_header(["Name", "Value"])
-        .add_row(["Id", worker.id.as_str()])
-        .add_row(["WorkerId", worker.worker_id.as_str()])
-        .add_row(["IPs", worker.ips.as_str()])
-        .add_row(["SupportTypes", worker.support_types.as_str()])
-        .add_row(["CreateAt", timestamp_to_string(worker.create_at).as_str()])
-        .add_row(["UpdateAt", timestamp_to_string(worker.update_at).as_str()])
-        .build()
-        .with(Style::ascii());
-    println!("{}", table);
+    let mut table = Builder::default();
+
+    table.set_header(["Name", "Value"])
+        .push_record(["Id", worker.id.as_str()])
+        .push_record(["WorkerId", worker.worker_id.as_str()])
+        .push_record(["IPs", worker.ips.as_str()])
+        .push_record(["SupportTypes", worker.support_types.as_str()])
+        .push_record(["CreateAt", timestamp_to_string(worker.create_at).as_str()])
+        .push_record(["UpdateAt", timestamp_to_string(worker.update_at).as_str()]);
+    println!("{}", table.build().with(Style::ascii()));
     Ok(())
 }
