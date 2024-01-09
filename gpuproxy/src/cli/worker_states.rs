@@ -163,9 +163,6 @@ fn print_one_worker(worker: WorkerState) -> Result<()> {
         .push_record(["SupportTypes", worker.support_types.as_str()])
         .push_record(["CreateAt", timestamp_to_string(worker.create_at).as_str()])
         .push_record(["UpdateAt", timestamp_to_string(worker.update_at).as_str()]);
-
-    let  t=  table.build();
-        // .with(Style::ascii());
-    println!("{}", t);
+    println!("{}", table.build().with(Style::ascii()));
     Ok(())
 }

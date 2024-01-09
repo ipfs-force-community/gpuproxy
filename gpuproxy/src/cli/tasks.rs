@@ -160,11 +160,7 @@ fn print_task(tasks: Vec<Task>) -> Result<()> {
             timestamp_to_string(task.complete_at).as_str(),
         ]);
     }
-
-    // let table = builder.build().with(Style::ascii());
-    let table = builder.build();
-    // table.with(Style::ascii());
-    println!("{}", table);
+    println!("{}", builder.build().with(Style::ascii()));
     Ok(())
 }
 
@@ -183,9 +179,8 @@ fn print_one_task(task: Task) -> Result<()> {
         .push_record(["CreateAt", timestamp_to_string(task.create_at).as_str()])
         .push_record(["StartAt", timestamp_to_string(task.start_at).as_str()])
         .push_record(["CompleteAt", timestamp_to_string(task.complete_at).as_str()]);
-        let t = table.build();
-        // .with(Style::ascii());
-    println!("{}", t);
+
+    println!("{}", table.build().with(Style::ascii()));
     Ok(())
 }
 
